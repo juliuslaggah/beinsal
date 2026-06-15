@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Admin Orders</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .status-pending { background-color: #fef3c7; color: #d97706; }
+        .status-processing { background-color: #dbeafe; color: #2563eb; }
+        .status-shipped { background-color: #e0e7ff; color: #4f46e5; }
+        .status-delivered { background-color: #d1fae5; color: #059669; }
+        .status-cancelled { background-color: #fee2e2; color: #dc2626; }
+        .order-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .delivery-code {
+            font-family: monospace;
+            font-size: 18px;
+            letter-spacing: 2px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 pb-8">
+    <!-- Single line header with integrated navigation -->
+    <div class="bg-[#800020] text-white p-3 sticky top-0 z-10 shadow-md">
+        <div class="flex items-center justify-between max-w-6xl mx-auto flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                <span class="font-bold">Order Management</span>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <button class="nav-tab hover:underline" data-page="dashboard">Dashboard</button>
+                <button class="nav-tab hover:underline" data-page="orders">Order Management</button>
+                <button class="nav-tab hover:underline" data-page="chat">Support Chat</button>
+                <button class="nav-tab hover:underline" data-page="delivery">Manage Delivery Persons</button>
+                <button class="nav-tab hover:underline" data-page="staff">Manage Staff</button>
+                <button class="nav-tab hover:underline" data-page="site">View Site</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="admin-name" class="text-sm">Loading...</span>
+                <button onclick="logout()" class="bg-white text-[#800020] px-2 py-1 rounded text-sm font-semibold">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+            <div class="bg-white rounded-lg shadow p-3 text-center">
+                <p class="text-2xl font-bold text-[#800020]" id="total-orders">0</p>
+                <p class="text-xs text-gray-500">Total Orders</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 text-center">
+                <p class="text-2xl font-bold text-yellow-600" id="pending-count">0</p>
+                <p class="text-xs text-gray-500">Pending</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 text-center">
+                <p class="text-2xl font-bold text-blue-600" id="processing-count">0</p>
+                <p class="text-xs text-gray-500">Processing</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 text-center">
+                <p class="text-2xl font-bold text-indigo-600" id="shipped-count">0</p>
+                <p class="text-xs text-gray-500">Shipped</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-3 text-center">
+                <p class="text-2xl font-bold text-green-600" id="delivered-count">0</p>
+                <p class="text-xs text-gray-500">Delivered</p>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="bg-white rounded-lg shadow mb-4 overflow-x-auto whitespace-nowrap">
+            <div class="inline-flex p-2 space-x-2">
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-[#800020] text-white" data-filter="all">All Orders</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-200 text-gray-700" data-filter="pending">Pending</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-200 text-gray-700" data-filter="processing">Processing</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-200 text-gray-700" data-filter="shipped">Shipped</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-200 text-gray-700" data-filter="delivered">Delivered</button>
+                <button class="filter-btn px-4 py-2 rounded-lg text-sm font-semibold bg-gray-200 text-gray-700" data-filter="cancelled">Cancelled</button>
+            </div>
+        </div>
+
+        <!-- Orders List -->
+        <div id="orders-container" class="space-y-3">
+            <div class="text-center text-gray-500 py-8">Loading orders...</div>
+        </div>
+    </div>
+
+    <!-- Order Detail Modal -->
+    <div id="order-modal" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg w-full max-w-md max-h-[85vh] overflow-y-auto">
+            <div class="p-4 border-b sticky top-0 bg-white flex justify-between items-center">
+                <h3 class="font-bold text-lg" id="modal-order-id">Order Details</h3>
+                <button onclick="closeOrderModal()" class="text-gray-500">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="p-4">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Status Modal -->
+    <div id="status-modal" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg w-full max-w-sm">
+            <div class="p-4 border-b">
+                <h3 class="font-bold text-lg">Update Order Status</h3>
+            </div>
+            <div class="p-4">
+                <p class="text-sm text-gray-600 mb-3">Order ID: <span id="status-order-id" class="font-mono"></span></p>
+                <label class="block text-sm font-medium mb-2">New Status</label>
+                <select id="new-status" class="w-full border rounded-lg p-2 mb-4">
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <div id="delivery-code-section" class="mb-4 hidden">
+                    <label class="block text-sm font-medium mb-2">Delivery Code (for customer)</label>
+                    <div class="bg-gray-100 p-3 rounded-lg text-center">
+                        <span id="delivery-code-display" class="delivery-code text-xl"></span>
+                        <button onclick="copyDeliveryCode()" class="ml-2 text-xs bg-[#800020] text-white px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Share this code with the delivery person</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closeStatusModal()" class="flex-1 bg-gray-200 py-2 rounded-lg">Cancel</button>
+                    <button onclick="updateOrderStatus()" class="flex-1 bg-[#800020] text-white py-2 rounded-lg">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let allOrders = [];
+        let currentFilter = 'all';
+        let selectedOrderId = null;
+        let currentDeliveryCode = null;
+        let currentStaffRole = null;
+        let currentStaffName = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('staffToken');
+            if (!token) {
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/staff/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                if (!result.valid) {
+                    localStorage.removeItem('staffToken');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                currentStaffRole = result.role;
+                currentStaffName = result.full_name;
+                
+                document.getElementById('admin-name').textContent = currentStaffName;
+                
+                if (currentStaffRole === 'support_staff') {
+                    document.querySelectorAll('.update-status-btn').forEach(btn => btn.style.display = 'none');
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+        }
+
+        // Navigate to different pages
+        function navigateTo(page) {
+            switch(page) {
+                case 'dashboard':
+                    window.location.href = '/admin/admin-dashboard.html';
+                    break;
+                case 'orders':
+                    window.location.href = '/admin/orders.html';
+                    break;
+                case 'chat':
+                    window.location.href = '/admin/support-chat.html';
+                    break;
+                case 'delivery':
+                    window.location.href = '/admin/manage-delivery-person.html';
+                    break;
+                case 'staff':
+                    window.location.href = '/admin/manage-staff.html';
+                    break;
+                case 'site':
+                    window.open('/', '_blank');
+                    break;
+            }
+        }
+
+        // Setup navigation tabs
+        function setupNavTabs() {
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const page = tab.getAttribute('data-page');
+                    navigateTo(page);
+                });
+            });
+        }
+
+        function generateDeliveryCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        function loadOrders() {
+            const savedOrders = localStorage.getItem('beinSalOrders');
+            if (savedOrders) {
+                allOrders = JSON.parse(savedOrders);
+                allOrders.sort((a, b) => new Date(b.date) - new Date(a.date));
+            } else {
+                allOrders = [];
+            }
+            
+            updateStats();
+            filterAndDisplayOrders();
+        }
+
+        function updateStats() {
+            const total = allOrders.length;
+            const pending = allOrders.filter(o => o.status === 'pending').length;
+            const processing = allOrders.filter(o => o.status === 'processing').length;
+            const shipped = allOrders.filter(o => o.status === 'shipped').length;
+            const delivered = allOrders.filter(o => o.status === 'delivered').length;
+            
+            document.getElementById('total-orders').textContent = total;
+            document.getElementById('pending-count').textContent = pending;
+            document.getElementById('processing-count').textContent = processing;
+            document.getElementById('shipped-count').textContent = shipped;
+            document.getElementById('delivered-count').textContent = delivered;
+        }
+
+        function filterAndDisplayOrders() {
+            let filteredOrders = allOrders;
+            
+            if (currentFilter !== 'all') {
+                filteredOrders = allOrders.filter(order => order.status === currentFilter);
+            }
+            
+            displayOrders(filteredOrders);
+        }
+
+        function displayOrders(orders) {
+            const container = document.getElementById('orders-container');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">No orders found</div>';
+                return;
+            }
+            
+            container.innerHTML = orders.map(order => {
+                const statusClass = getStatusClass(order.status);
+                const statusText = getStatusText(order.status);
+                const date = new Date(order.date).toLocaleDateString();
+                const time = new Date(order.date).toLocaleTimeString();
+                const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                const showUpdateButton = currentStaffRole !== 'support_staff';
+                
+                return `
+                    <div class="order-card bg-white rounded-lg shadow overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50 flex flex-wrap justify-between items-center gap-2">
+                            <div>
+                                <p class="font-mono text-sm font-semibold">${order.orderId}</p>
+                                <p class="text-xs text-gray-500">${date} at ${time}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${statusText}</span>
+                                ${showUpdateButton ? `<button onclick="openStatusModal('${order.orderId}', '${order.status}', '${order.deliveryCode || ''}')" class="text-xs bg-[#800020] text-white px-2 py-1 rounded hover:bg-[#a00028]">
+                                    Update
+                                </button>` : ''}
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <p class="font-semibold">${escapeHtml(order.deliveryAddress.fullName)}</p>
+                                    <p class="text-xs text-gray-500">${escapeHtml(order.deliveryAddress.phone)}</p>
+                                    <p class="text-xs text-gray-500">${escapeHtml(order.deliveryAddress.street)}, ${escapeHtml(order.deliveryAddress.city)}</p>
+                                </div>
+                                <p class="font-bold text-[#800020]">${order.total.toLocaleString()} SLL</p>
+                            </div>
+                            ${order.status === 'shipped' && order.deliveryCode ? `
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-2">
+                                    <p class="text-xs text-blue-700 font-semibold">Delivery Code</p>
+                                    <p class="delivery-code text-lg">${order.deliveryCode}</p>
+                                </div>
+                            ` : ''}
+                            <div class="border-t pt-2 mt-2">
+                                <p class="text-xs text-gray-500 mb-1">${itemCount} item(s)</p>
+                                <div class="flex flex-wrap gap-2">
+                                    ${order.items.slice(0, 3).map(item => `
+                                        <span class="text-xs bg-gray-100 px-2 py-1 rounded">${escapeHtml(item.name)} (${item.size}) x${item.quantity}</span>
+                                    `).join('')}
+                                    ${order.items.length > 3 ? `<span class="text-xs bg-gray-100 px-2 py-1 rounded">+${order.items.length - 3} more</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 border-t bg-gray-50 flex gap-2">
+                            <button onclick="viewOrderDetails('${order.orderId}')" class="text-sm text-[#800020] border border-[#800020] px-3 py-1 rounded hover:bg-[#800020] hover:text-white transition">
+                                View Details
+                            </button>
+                            ${showUpdateButton ? `<button onclick="openStatusModal('${order.orderId}', '${order.status}', '${order.deliveryCode || ''}')" class="text-sm bg-[#800020] text-white px-3 py-1 rounded hover:bg-[#a00028] transition">
+                                Update Status
+                            </button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        function viewOrderDetails(orderId) {
+            const order = allOrders.find(o => o.orderId === orderId);
+            if (!order) return;
+            
+            const date = new Date(order.date).toLocaleString();
+            const statusClass = getStatusClass(order.status);
+            const statusText = getStatusText(order.status);
+            
+            const modalContent = document.getElementById('modal-content');
+            modalContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Order ID</p>
+                        <p class="font-mono text-sm">${order.orderId}</p>
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Date</p>
+                        <p class="text-sm">${date}</p>
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Status</p>
+                        <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${statusText}</span>
+                    </div>
+                    ${order.deliveryCode ? `
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Delivery Code</p>
+                        <p class="delivery-code text-lg">${order.deliveryCode}</p>
+                    </div>
+                    ` : ''}
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Payment Method</p>
+                        <p class="text-sm">${getPaymentMethodText(order.paymentMethod)}</p>
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Customer</p>
+                        <p class="text-sm">${escapeHtml(order.deliveryAddress.fullName)}</p>
+                        <p class="text-sm">${escapeHtml(order.deliveryAddress.phone)}</p>
+                        <p class="text-sm">${escapeHtml(order.deliveryAddress.street)}, ${escapeHtml(order.deliveryAddress.city)}</p>
+                        ${order.deliveryAddress.landmark ? `<p class="text-sm">Landmark: ${escapeHtml(order.deliveryAddress.landmark)}</p>` : ''}
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500 mb-2">Items</p>
+                        ${order.items.map(item => `
+                            <div class="flex justify-between text-sm py-1">
+                                <span>${escapeHtml(item.name)} (${item.size}) x${item.quantity}</span>
+                                <span>${(item.price * item.quantity).toLocaleString()} SLL</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="pt-2">
+                        <div class="flex justify-between font-bold">
+                            <span>Total</span>
+                            <span class="text-[#800020]">${order.total.toLocaleString()} SLL</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('order-modal').classList.remove('hidden');
+            document.getElementById('order-modal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeOrderModal() {
+            document.getElementById('order-modal').classList.add('hidden');
+            document.getElementById('order-modal').classList.remove('flex');
+        }
+
+        function openStatusModal(orderId, currentStatus, existingCode) {
+            selectedOrderId = orderId;
+            document.getElementById('status-order-id').textContent = orderId;
+            document.getElementById('new-status').value = currentStatus;
+            
+            const deliveryCodeSection = document.getElementById('delivery-code-section');
+            const deliveryCodeDisplay = document.getElementById('delivery-code-display');
+            
+            if (currentStatus === 'shipped' || document.getElementById('new-status').value === 'shipped') {
+                if (existingCode) {
+                    currentDeliveryCode = existingCode;
+                } else {
+                    currentDeliveryCode = generateDeliveryCode();
+                }
+                deliveryCodeDisplay.textContent = currentDeliveryCode;
+                deliveryCodeSection.classList.remove('hidden');
+            } else {
+                deliveryCodeSection.classList.add('hidden');
+                currentDeliveryCode = null;
+            }
+            
+            document.getElementById('status-modal').classList.remove('hidden');
+            document.getElementById('status-modal').classList.add('flex');
+        }
+
+        function closeStatusModal() {
+            document.getElementById('status-modal').classList.add('hidden');
+            document.getElementById('status-modal').classList.remove('flex');
+            selectedOrderId = null;
+            currentDeliveryCode = null;
+        }
+
+        function copyDeliveryCode() {
+            const code = document.getElementById('delivery-code-display').textContent;
+            navigator.clipboard.writeText(code);
+            alert('Delivery code copied to clipboard');
+        }
+
+        function updateOrderStatus() {
+            if (!selectedOrderId) return;
+            
+            const newStatus = document.getElementById('new-status').value;
+            const orderIndex = allOrders.findIndex(o => o.orderId === selectedOrderId);
+            
+            if (orderIndex !== -1) {
+                allOrders[orderIndex].status = newStatus;
+                
+                if (newStatus === 'shipped') {
+                    if (!allOrders[orderIndex].deliveryCode) {
+                        const deliveryCode = currentDeliveryCode || generateDeliveryCode();
+                        allOrders[orderIndex].deliveryCode = deliveryCode;
+                        console.log(`[SIMULATED] Delivery code for ${selectedOrderId}: ${deliveryCode}`);
+                        alert(`Delivery Code: ${deliveryCode}\nShare this code with the delivery person.`);
+                    }
+                }
+                
+                localStorage.setItem('beinSalOrders', JSON.stringify(allOrders));
+                
+                loadOrders();
+                closeStatusModal();
+                alert(`Order ${selectedOrderId} status updated to ${getStatusText(newStatus)}`);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusSelect = document.getElementById('new-status');
+            if (statusSelect) {
+                statusSelect.addEventListener('change', () => {
+                    const deliveryCodeSection = document.getElementById('delivery-code-section');
+                    if (statusSelect.value === 'shipped') {
+                        if (!currentDeliveryCode) {
+                            currentDeliveryCode = generateDeliveryCode();
+                            document.getElementById('delivery-code-display').textContent = currentDeliveryCode;
+                        }
+                        deliveryCodeSection.classList.remove('hidden');
+                    } else {
+                        deliveryCodeSection.classList.add('hidden');
+                    }
+                });
+            }
+        });
+
+        function setupFilters() {
+            const filters = document.querySelectorAll('.filter-btn');
+            filters.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filters.forEach(b => {
+                        b.classList.remove('bg-[#800020]', 'text-white');
+                        b.classList.add('bg-gray-200', 'text-gray-700');
+                    });
+                    btn.classList.add('bg-[#800020]', 'text-white');
+                    btn.classList.remove('bg-gray-200', 'text-gray-700');
+                    
+                    currentFilter = btn.getAttribute('data-filter');
+                    filterAndDisplayOrders();
+                });
+            });
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'pending': return 'status-pending';
+                case 'processing': return 'status-processing';
+                case 'shipped': return 'status-shipped';
+                case 'delivered': return 'status-delivered';
+                case 'cancelled': return 'status-cancelled';
+                default: return 'status-pending';
+            }
+        }
+
+        function getStatusText(status) {
+            switch(status) {
+                case 'pending': return 'Pending';
+                case 'processing': return 'Processing';
+                case 'shipped': return 'Shipped';
+                case 'delivered': return 'Delivered';
+                case 'cancelled': return 'Cancelled';
+                default: return status;
+            }
+        }
+
+        function getPaymentMethodText(method) {
+            switch(method) {
+                case 'orange-money': return 'Orange Money';
+                case 'afri-money': return 'AfriMoney';
+                case 'visa': return 'Visa / Mastercard';
+                case 'bank-transfer': return 'Bank Transfer (SLCB)';
+                default: return method;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('staffToken');
+                localStorage.removeItem('staffName');
+                localStorage.removeItem('staffRole');
+                window.location.href = '/admin/staff-login.html';
+            }
+        }
+
+        async function init() {
+            const authorized = await checkAuth();
+            if (authorized) {
+                loadOrders();
+                setTimeout(setupFilters, 100);
+                setupNavTabs();
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

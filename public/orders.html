@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - My Orders</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .status-pending { background-color: #fef3c7; color: #d97706; }
+        .status-processing { background-color: #dbeafe; color: #2563eb; }
+        .status-shipped { background-color: #e0e7ff; color: #4f46e5; }
+        .status-delivered { background-color: #d1fae5; color: #059669; }
+        .status-cancelled { background-color: #fee2e2; color: #dc2626; }
+        .delivery-code {
+            font-family: monospace;
+            font-size: 20px;
+            letter-spacing: 3px;
+            font-weight: bold;
+            background-color: #f3f4f6;
+            padding: 8px 12px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 pb-24">
+    <!-- Maroon header bar with back button -->
+    <div class="bg-[#800020] text-white p-4 sticky top-0 z-10 shadow-md flex items-center gap-4">
+        <button onclick="window.location.href='/account.html'" class="text-white">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <h1 class="text-xl font-bold flex-1 text-center">My Orders</h1>
+        <div class="w-5"></div>
+    </div>
+
+    <!-- Status Filter Tabs -->
+    <div class="bg-white border-b border-gray-200 overflow-x-auto whitespace-nowrap sticky top-[72px] z-10">
+        <div class="inline-flex px-4 py-2 space-x-6">
+            <button class="filter-btn text-[#800020] font-semibold border-b-2 border-[#800020] pb-2" data-filter="all">All</button>
+            <button class="filter-btn text-gray-500 pb-2" data-filter="pending">Pending</button>
+            <button class="filter-btn text-gray-500 pb-2" data-filter="processing">Processing</button>
+            <button class="filter-btn text-gray-500 pb-2" data-filter="shipped">Shipped</button>
+            <button class="filter-btn text-gray-500 pb-2" data-filter="delivered">Delivered</button>
+            <button class="filter-btn text-gray-500 pb-2" data-filter="cancelled">Cancelled</button>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-4 max-w-md">
+        <!-- Orders Container -->
+        <div id="orders-container" class="space-y-4">
+            <div class="text-center text-gray-500 py-8">Loading orders...</div>
+        </div>
+
+        <!-- Empty Orders Message -->
+        <div id="empty-orders" class="text-center py-12 hidden">
+            <i data-lucide="package" class="w-16 h-16 text-gray-300 mx-auto mb-3"></i>
+            <p class="text-gray-500 mb-4">No orders found</p>
+            <button onclick="window.location.href='/'" class="bg-[#800020] text-white px-6 py-2 rounded-lg">
+                Start Shopping
+            </button>
+        </div>
+    </div>
+
+    <!-- Order Detail Modal (hidden by default) -->
+    <div id="order-modal" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg w-full max-w-md max-h-[80vh] overflow-y-auto">
+            <div class="p-4 border-b sticky top-0 bg-white">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-lg" id="modal-order-id">Order Details</h3>
+                    <button onclick="closeOrderModal()" class="text-gray-500">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="modal-content" class="p-4">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom navigation bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+        <div class="flex justify-around items-center py-2 max-w-md mx-auto">
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/'">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Home</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer">
+                <i data-lucide="search" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Search</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/cart.html'">
+                <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Cart</span>
+                <span id="cart-count" class="absolute text-xs bg-red-500 text-white rounded-full px-1 -mt-1 ml-3 hidden">0</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/chat.html'">
+                <i data-lucide="message-circle" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Chat</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/account.html'">
+                <i data-lucide="user" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Account</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let allOrders = [];
+        let currentFilter = 'all';
+
+        // Check if user is logged in
+        function isLoggedIn() {
+            return localStorage.getItem('isLoggedIn') === 'true';
+        }
+
+        // Load orders from localStorage
+        function loadOrders() {
+            const savedOrders = localStorage.getItem('beinSalOrders');
+            if (savedOrders) {
+                allOrders = JSON.parse(savedOrders);
+                // Sort by date (newest first)
+                allOrders.sort((a, b) => new Date(b.date) - new Date(a.date));
+            } else {
+                allOrders = [];
+            }
+            
+            if (allOrders.length === 0) {
+                showEmptyOrders();
+            } else {
+                filterAndDisplayOrders();
+            }
+        }
+
+        // Filter and display orders based on selected tab
+        function filterAndDisplayOrders() {
+            let filteredOrders = allOrders;
+            
+            if (currentFilter !== 'all') {
+                filteredOrders = allOrders.filter(order => order.status === currentFilter);
+            }
+            
+            if (filteredOrders.length === 0) {
+                showEmptyOrders();
+            } else {
+                displayOrders(filteredOrders);
+                document.getElementById('empty-orders').classList.add('hidden');
+                document.getElementById('orders-container').classList.remove('hidden');
+            }
+        }
+
+        // Display orders in container
+        function displayOrders(orders) {
+            const container = document.getElementById('orders-container');
+            
+            container.innerHTML = orders.map(order => {
+                const statusClass = getStatusClass(order.status);
+                const statusText = getStatusText(order.status);
+                const date = new Date(order.date).toLocaleDateString();
+                const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                const hasDeliveryCode = order.deliveryCode && order.status === 'shipped';
+                
+                return `
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <div>
+                                <p class="font-semibold">${order.orderId}</p>
+                                <p class="text-xs text-gray-500">${date}</p>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="p-4">
+                            <div class="space-y-2">
+                                ${order.items.slice(0, 2).map(item => `
+                                    <div class="flex justify-between text-sm">
+                                        <span>${escapeHtml(item.name)} (${item.size}) x${item.quantity}</span>
+                                        <span class="font-semibold">${(item.price * item.quantity).toLocaleString()} SLL</span>
+                                    </div>
+                                `).join('')}
+                                ${order.items.length > 2 ? `<p class="text-xs text-gray-400">+${order.items.length - 2} more items</p>` : ''}
+                            </div>
+                            ${hasDeliveryCode ? `
+                                <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <p class="text-xs text-blue-700 font-semibold mb-1">📦 Delivery Code</p>
+                                    <p class="delivery-code text-center">${order.deliveryCode}</p>
+                                    <p class="text-xs text-gray-500 mt-2 text-center">Show this code to the delivery person when you receive your package</p>
+                                </div>
+                            ` : ''}
+                            <div class="border-t mt-3 pt-3 flex justify-between items-center">
+                                <div>
+                                    <p class="text-xs text-gray-500">Payment: ${getPaymentMethodText(order.paymentMethod)}</p>
+                                    <p class="text-xs text-gray-500">Delivery to: ${escapeHtml(order.deliveryAddress.city)}</p>
+                                </div>
+                                <p class="font-bold text-[#800020]">Total: ${order.total.toLocaleString()} SLL</p>
+                            </div>
+                        </div>
+                        <div class="p-3 border-t bg-gray-50 flex gap-2">
+                            <button onclick="viewOrderDetails('${order.orderId}')" class="flex-1 text-sm text-[#800020] border border-[#800020] py-1 rounded-lg hover:bg-[#800020] hover:text-white transition">
+                                View Details
+                            </button>
+                            ${order.status === 'delivered' ? `
+                                <button onclick="writeReview('${order.orderId}')" class="flex-1 text-sm bg-[#800020] text-white py-1 rounded-lg hover:bg-[#a00028] transition">
+                                    Write Review
+                                </button>
+                            ` : ''}
+                            ${order.status === 'pending' ? `
+                                <button onclick="cancelOrder('${order.orderId}')" class="flex-1 text-sm text-red-600 border border-red-600 py-1 rounded-lg hover:bg-red-600 hover:text-white transition">
+                                    Cancel
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        // View order details in modal
+        function viewOrderDetails(orderId) {
+            const order = allOrders.find(o => o.orderId === orderId);
+            if (!order) return;
+            
+            const modalContent = document.getElementById('modal-content');
+            const date = new Date(order.date).toLocaleString();
+            
+            modalContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Order ID</p>
+                        <p class="font-mono text-sm">${order.orderId}</p>
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Date</p>
+                        <p class="text-sm">${date}</p>
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Status</p>
+                        <span class="text-xs px-2 py-1 rounded-full ${getStatusClass(order.status)}">${getStatusText(order.status)}</span>
+                    </div>
+                    ${order.deliveryCode && order.status === 'shipped' ? `
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Delivery Code</p>
+                        <p class="delivery-code">${order.deliveryCode}</p>
+                        <p class="text-xs text-gray-500 mt-1">Share this code with the delivery person</p>
+                    </div>
+                    ` : ''}
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Payment Method</p>
+                        <p class="text-sm">${getPaymentMethodText(order.paymentMethod)}</p>
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500">Delivery Address</p>
+                        <p class="text-sm">${escapeHtml(order.deliveryAddress.fullName)}</p>
+                        <p class="text-sm">${escapeHtml(order.deliveryAddress.phone)}</p>
+                        <p class="text-sm">${escapeHtml(order.deliveryAddress.street)}, ${escapeHtml(order.deliveryAddress.city)}</p>
+                        ${order.deliveryAddress.landmark ? `<p class="text-sm">Landmark: ${escapeHtml(order.deliveryAddress.landmark)}</p>` : ''}
+                    </div>
+                    <div class="pb-2 border-b">
+                        <p class="text-sm text-gray-500 mb-2">Items</p>
+                        ${order.items.map(item => `
+                            <div class="flex justify-between text-sm py-1">
+                                <span>${escapeHtml(item.name)} (${item.size}) x${item.quantity}</span>
+                                <span>${(item.price * item.quantity).toLocaleString()} SLL</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="pt-2">
+                        <div class="flex justify-between font-bold">
+                            <span>Total</span>
+                            <span class="text-[#800020]">${order.total.toLocaleString()} SLL</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('order-modal').classList.remove('hidden');
+            document.getElementById('order-modal').classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeOrderModal() {
+            document.getElementById('order-modal').classList.add('hidden');
+            document.getElementById('order-modal').classList.remove('flex');
+        }
+
+        // Cancel order
+        function cancelOrder(orderId) {
+            if (confirm('Are you sure you want to cancel this order?')) {
+                const orderIndex = allOrders.findIndex(o => o.orderId === orderId);
+                if (orderIndex !== -1) {
+                    allOrders[orderIndex].status = 'cancelled';
+                    localStorage.setItem('beinSalOrders', JSON.stringify(allOrders));
+                    loadOrders();
+                    alert('Order cancelled successfully');
+                }
+            }
+        }
+
+        // Write review
+        function writeReview(orderId) {
+            alert('Review feature coming soon. You will be able to rate and review products you have purchased.');
+        }
+
+        // Show empty orders message
+        function showEmptyOrders() {
+            document.getElementById('orders-container').innerHTML = '';
+            document.getElementById('orders-container').classList.add('hidden');
+            document.getElementById('empty-orders').classList.remove('hidden');
+        }
+
+        // Helper functions
+        function getStatusClass(status) {
+            switch(status) {
+                case 'pending': return 'status-pending';
+                case 'processing': return 'status-processing';
+                case 'shipped': return 'status-shipped';
+                case 'delivered': return 'status-delivered';
+                case 'cancelled': return 'status-cancelled';
+                default: return 'status-pending';
+            }
+        }
+
+        function getStatusText(status) {
+            switch(status) {
+                case 'pending': return 'Pending';
+                case 'processing': return 'Processing';
+                case 'shipped': return 'Shipped';
+                case 'delivered': return 'Delivered';
+                case 'cancelled': return 'Cancelled';
+                default: return status;
+            }
+        }
+
+        function getPaymentMethodText(method) {
+            switch(method) {
+                case 'orange-money': return 'Orange Money';
+                case 'afri-money': return 'AfriMoney';
+                case 'visa': return 'Visa / Mastercard';
+                case 'bank-transfer': return 'Bank Transfer (SLCB)';
+                default: return method;
+            }
+        }
+
+        // Update cart count badge
+        function updateCartCount() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const count = cart.length;
+            const badge = document.getElementById('cart-count');
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Setup filter tabs
+        function setupFilters() {
+            const filters = document.querySelectorAll('.filter-btn');
+            filters.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update active style
+                    filters.forEach(b => {
+                        b.classList.remove('text-[#800020]', 'font-semibold', 'border-b-2', 'border-[#800020]');
+                        b.classList.add('text-gray-500');
+                    });
+                    btn.classList.add('text-[#800020]', 'font-semibold', 'border-b-2', 'border-[#800020]');
+                    btn.classList.remove('text-gray-500');
+                    
+                    // Update filter and refresh
+                    currentFilter = btn.getAttribute('data-filter');
+                    filterAndDisplayOrders();
+                });
+            });
+        }
+
+        // Redirect to login if not logged in
+        function checkAuth() {
+            if (!isLoggedIn()) {
+                localStorage.setItem('redirectAfterLogin', '/orders.html');
+                window.location.href = '/register.html';
+                return false;
+            }
+            return true;
+        }
+
+        // Initialize
+        if (checkAuth()) {
+            loadOrders();
+            updateCartCount();
+            setTimeout(setupFilters, 100);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

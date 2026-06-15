@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Product</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Swiper container styles */
+        .swiper-container {
+            position: relative;
+            overflow: hidden;
+            touch-action: pan-y pinch-zoom;
+        }
+        .swiper-wrapper {
+            display: flex;
+            transition-timing-function: ease-out;
+        }
+        .swiper-slide {
+            flex-shrink: 0;
+            width: 100%;
+        }
+        .swiper-dots {
+            position: absolute;
+            bottom: 12px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+        .swiper-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: rgba(255,255,255,0.5);
+            transition: all 0.2s;
+        }
+        .swiper-dot.active {
+            width: 20px;
+            border-radius: 4px;
+            background-color: white;
+        }
+        /* Horizontal scroll for recommendations */
+        .recommendations-scroll {
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        .recommendation-card {
+            scroll-snap-align: start;
+            width: 140px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body class="pb-24 bg-gray-50">
+    <!-- Maroon header bar with back button -->
+    <div class="bg-[#800020] text-white p-4 sticky top-0 z-10 shadow-md flex items-center gap-4">
+        <button onclick="window.location.href='/'" class="text-white">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <h1 class="text-xl font-bold flex-1 text-center">Product Details</h1>
+        <div class="w-5"></div>
+    </div>
+
+    <!-- Main content -->
+    <div class="container mx-auto px-4 py-4">
+        <div id="product-detail" class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="text-center py-10 text-gray-500">Loading product...</div>
+        </div>
+    </div>
+
+    <!-- Bottom navigation bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+        <div class="flex justify-around items-center py-2 max-w-md mx-auto">
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/'">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Home</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer">
+                <i data-lucide="search" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Search</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/cart.html'">
+                <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Cart</span>
+                <span id="cart-count" class="absolute text-xs bg-red-500 text-white rounded-full px-1 -mt-1 ml-3 hidden">0</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer">
+                <i data-lucide="message-circle" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Chat</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer">
+                <i data-lucide="user" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Account</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let currentProduct = null;
+        let selectedSize = null;
+        let currentPrice = 0;
+        let swiperIndex = 0;
+        let swiperStartX = 0;
+        let swiperCurrentX = 0;
+        let swiperIsDragging = false;
+        let allProducts = [];
+
+        // Check if user is logged in
+        function isLoggedIn() {
+            return localStorage.getItem('isLoggedIn') === 'true';
+        }
+
+        // Get product ID from URL
+        function getProductId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+
+        // Load all products for recommendations
+        async function loadAllProducts() {
+            try {
+                const response = await fetch('/api/products');
+                allProducts = await response.json();
+            } catch (error) {
+                console.error('Error loading products for recommendations:', error);
+            }
+        }
+
+        // Load product details
+        async function loadProduct() {
+            await loadAllProducts();
+            const productId = getProductId();
+            if (!productId) {
+                document.getElementById('product-detail').innerHTML = '<div class="text-center py-10 text-red-500">Product not found</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/products/${productId}`);
+                if (!response.ok) {
+                    throw new Error('Product not found');
+                }
+                currentProduct = await response.json();
+                currentPrice = currentProduct.price;
+                displayProduct();
+                trackRecentlyViewed(parseInt(productId));
+            } catch (error) {
+                console.error('Error loading product:', error);
+                document.getElementById('product-detail').innerHTML = '<div class="text-center py-10 text-red-500">Product not found</div>';
+            }
+        }
+
+        // Get recommendations (same category, exclude current product)
+        function getRecommendations() {
+            if (!currentProduct || !allProducts.length) return [];
+            
+            // Products from same category, excluding current product
+            const sameCategory = allProducts.filter(p => 
+                p.category === currentProduct.category && p.id !== currentProduct.id
+            );
+            
+            // If less than 4, add some from other categories
+            let recommendations = [...sameCategory];
+            
+            if (recommendations.length < 4) {
+                const others = allProducts.filter(p => 
+                    p.category !== currentProduct.category && p.id !== currentProduct.id
+                );
+                recommendations = [...recommendations, ...others];
+            }
+            
+            // Randomize and return first 6
+            return recommendations.sort(() => 0.5 - Math.random()).slice(0, 6);
+        }
+
+        // Generate placeholder images (different colors for demo)
+        function getProductImages() {
+            const colors = ['#800020', '#2d6a4f', '#1e3a5f', '#b45309'];
+            return colors.map((color, index) => ({
+                id: index,
+                color: color,
+                label: index === 0 ? 'Front View' : (index === 1 ? 'Side View' : (index === 2 ? 'Back View' : 'Detail'))
+            }));
+        }
+
+        // Initialize swiper
+        function initSwiper() {
+            const wrapper = document.getElementById('swiper-wrapper');
+            const dotsContainer = document.getElementById('swiper-dots');
+            if (!wrapper || !dotsContainer) return;
+
+            const slides = wrapper.querySelectorAll('.swiper-slide');
+            const slideCount = slides.length;
+            if (slideCount === 0) return;
+
+            wrapper.style.width = `${slideCount * 100}%`;
+            
+            dotsContainer.innerHTML = '';
+            for (let i = 0; i < slideCount; i++) {
+                const dot = document.createElement('div');
+                dot.className = `swiper-dot ${i === 0 ? 'active' : ''}`;
+                dot.addEventListener('click', () => goToSlide(i));
+                dotsContainer.appendChild(dot);
+            }
+
+            const container = document.getElementById('swiper-container');
+            
+            const startDrag = (clientX) => {
+                swiperIsDragging = true;
+                swiperStartX = clientX;
+                swiperCurrentX = 0;
+                wrapper.style.transition = 'none';
+            };
+
+            const onDrag = (clientX) => {
+                if (!swiperIsDragging) return;
+                swiperCurrentX = clientX - swiperStartX;
+                const slideWidth = container.offsetWidth;
+                const maxDrag = slideWidth;
+                let drag = swiperCurrentX;
+                if (Math.abs(drag) > maxDrag) {
+                    drag = drag > 0 ? maxDrag : -maxDrag;
+                }
+                wrapper.style.transform = `translateX(calc(-${swiperIndex * 100}% + ${drag}px))`;
+            };
+
+            const endDrag = () => {
+                if (!swiperIsDragging) return;
+                swiperIsDragging = false;
+                wrapper.style.transition = 'transform 0.3s ease-out';
+                const slideWidth = document.getElementById('swiper-container').offsetWidth;
+                const threshold = slideWidth * 0.2;
+                if (Math.abs(swiperCurrentX) > threshold) {
+                    if (swiperCurrentX > 0 && swiperIndex > 0) {
+                        goToSlide(swiperIndex - 1);
+                    } else if (swiperCurrentX < 0 && swiperIndex < slides.length - 1) {
+                        goToSlide(swiperIndex + 1);
+                    } else {
+                        goToSlide(swiperIndex);
+                    }
+                } else {
+                    goToSlide(swiperIndex);
+                }
+                swiperCurrentX = 0;
+            };
+
+            container.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientX));
+            container.addEventListener('touchmove', (e) => {
+                onDrag(e.touches[0].clientX);
+                e.preventDefault();
+            });
+            container.addEventListener('touchend', endDrag);
+            container.addEventListener('mousedown', (e) => startDrag(e.clientX));
+            window.addEventListener('mousemove', (e) => onDrag(e.clientX));
+            window.addEventListener('mouseup', endDrag);
+        }
+
+        function goToSlide(index) {
+            const wrapper = document.getElementById('swiper-wrapper');
+            const dots = document.querySelectorAll('.swiper-dot');
+            if (!wrapper) return;
+            swiperIndex = index;
+            wrapper.style.transform = `translateX(-${swiperIndex * 100}%)`;
+            dots.forEach((dot, i) => {
+                if (i === swiperIndex) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+
+        // Display product with recommendations
+        function displayProduct() {
+            const container = document.getElementById('product-detail');
+            const images = getProductImages();
+            const recommendations = getRecommendations();
+            
+            const sizeOptions = currentProduct.sizes.map(size => 
+                `<option value="${size}">${size}</option>`
+            ).join('');
+
+            const slides = images.map(img => `
+                <div class="swiper-slide">
+                    <div class="h-64 bg-gray-200 flex flex-col items-center justify-center" style="background-color: ${img.color}20">
+                        <i data-lucide="shopping-bag" class="w-16 h-16 text-gray-600"></i>
+                        <span class="text-sm text-gray-600 mt-2">${img.label}</span>
+                        <span class="text-xs text-gray-400">Swipe to see more</span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Recommendations HTML
+            let recommendationsHtml = '';
+            if (recommendations.length > 0) {
+                recommendationsHtml = `
+                    <div class="mt-6 pt-4 border-t">
+                        <h2 class="font-semibold text-lg mb-3 flex items-center gap-2">
+                            <i data-lucide="users" class="w-5 h-5 text-[#800020]"></i>
+                            Customers also bought
+                        </h2>
+                        <div class="recommendations-scroll flex gap-3 overflow-x-auto pb-2">
+                            ${recommendations.map(rec => `
+                                <div class="recommendation-card bg-white rounded-lg shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition" onclick="goToProduct(${rec.id})">
+                                    <div class="h-28 bg-gray-200 flex items-center justify-center">
+                                        <i data-lucide="shopping-bag" class="w-8 h-8 text-gray-400"></i>
+                                    </div>
+                                    <div class="p-2">
+                                        <h3 class="font-semibold text-xs line-clamp-2">${escapeHtml(rec.name)}</h3>
+                                        <p class="text-[#800020] font-bold text-xs mt-1">${rec.price.toLocaleString()} SLL</p>
+                                        <p class="text-xs text-gray-500">Sold ${rec.sold.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div class="p-4">
+                    <!-- Image Swiper -->
+                    <div id="swiper-container" class="swiper-container rounded-lg mb-4 relative cursor-grab active:cursor-grabbing">
+                        <div id="swiper-wrapper" class="swiper-wrapper">
+                            ${slides}
+                        </div>
+                        <div id="swiper-dots" class="swiper-dots"></div>
+                    </div>
+                    
+                    <!-- Product Name -->
+                    <h1 class="text-xl font-bold mb-2">${escapeHtml(currentProduct.name)}</h1>
+                    
+                    <!-- Price -->
+                    <p class="text-2xl text-[#800020] font-bold mb-2" id="display-price">${currentPrice.toLocaleString()} SLL</p>
+                    
+                    <!-- Sold count -->
+                    <p class="text-sm text-gray-500 mb-2">Sold ${currentProduct.sold.toLocaleString()} units</p>
+                    
+                    <!-- Shipping estimate -->
+                    <p class="text-sm text-green-600 mb-4">Arrives in ${currentProduct.shippingDays} days</p>
+                    
+                    <!-- Size Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Select Size</label>
+                        <select id="size-select" class="w-full border rounded-lg p-2 bg-white">
+                            <option value="">Choose size</option>
+                            ${sizeOptions}
+                        </select>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 mt-6">
+                        <button onclick="addToCart()" class="flex-1 bg-gray-200 text-[#800020] py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
+                            Add to Cart
+                        </button>
+                        <button onclick="buyNow()" class="flex-1 bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                            Buy Now
+                        </button>
+                    </div>
+                    
+                    ${recommendationsHtml}
+                </div>
+            `;
+            
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                initSwiper();
+            }, 100);
+            
+            const sizeSelect = document.getElementById('size-select');
+            if (sizeSelect) {
+                sizeSelect.addEventListener('change', (e) => {
+                    selectedSize = e.target.value;
+                });
+            }
+        }
+
+        // Add to cart function with login check
+        function addToCart() {
+            const sizeSelect = document.getElementById('size-select');
+            if (!sizeSelect.value) {
+                alert('Please select a size');
+                return;
+            }
+            
+            if (!isLoggedIn()) {
+                if (confirm('Please register/login to add items to cart. Go to registration?')) {
+                    localStorage.setItem('redirectAfterLogin', '/cart.html');
+                    window.location.href = '/register.html';
+                }
+                return;
+            }
+            
+            let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            cart.push({
+                id: currentProduct.id,
+                name: currentProduct.name,
+                price: currentPrice,
+                size: sizeSelect.value
+            });
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartCount();
+            alert('Added to cart!');
+        }
+
+        // Buy now function with login check
+        function buyNow() {
+            const sizeSelect = document.getElementById('size-select');
+            if (!sizeSelect.value) {
+                alert('Please select a size');
+                return;
+            }
+            
+            if (!isLoggedIn()) {
+                localStorage.setItem('redirectAfterLogin', '/checkout.html');
+                localStorage.setItem('buyNowItem', JSON.stringify({
+                    id: currentProduct.id,
+                    name: currentProduct.name,
+                    price: currentPrice,
+                    size: sizeSelect.value,
+                    quantity: 1
+                }));
+                window.location.href = '/register.html';
+                return;
+            }
+            
+            localStorage.setItem('buyNowItem', JSON.stringify({
+                id: currentProduct.id,
+                name: currentProduct.name,
+                price: currentPrice,
+                size: sizeSelect.value,
+                quantity: 1
+            }));
+            window.location.href = '/checkout.html';
+        }
+
+        // Navigate to product
+        function goToProduct(productId) {
+            window.location.href = `/product.html?id=${productId}`;
+        }
+
+        // Update cart count badge
+        function updateCartCount() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const count = cart.length;
+            const badge = document.getElementById('cart-count');
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Track recently viewed
+        function trackRecentlyViewed(productId) {
+            let recent = JSON.parse(localStorage.getItem('recentlyViewed') || '[]');
+            recent = recent.filter(id => id !== productId);
+            recent.unshift(productId);
+            recent = recent.slice(0, 6);
+            localStorage.setItem('recentlyViewed', JSON.stringify(recent));
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        loadProduct();
+        updateCartCount();
+    </script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Checkout</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 pb-24">
+    <!-- Maroon header bar with back button -->
+    <div class="bg-[#800020] text-white p-4 sticky top-0 z-10 shadow-md flex items-center gap-4">
+        <button onclick="window.location.href='/cart.html'" class="text-white">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <h1 class="text-xl font-bold flex-1 text-center">Checkout</h1>
+        <div class="w-5"></div>
+    </div>
+
+    <div class="container mx-auto px-4 py-4 max-w-md">
+        <!-- Order Summary -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="font-semibold text-lg mb-3">Order Summary</h2>
+            <div id="order-items" class="space-y-3">
+                <div class="text-center text-gray-500 py-4">Loading order...</div>
+            </div>
+            <div class="border-t pt-3 mt-3">
+                <div class="flex justify-between font-bold">
+                    <span>Total</span>
+                    <span id="order-total" class="text-[#800020]">0 SLL</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delivery Address -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="font-semibold text-lg mb-3">Delivery Address</h2>
+            <div id="delivery-address" class="text-sm">
+                <div class="text-center text-gray-500 py-2">Loading address...</div>
+            </div>
+            <button onclick="window.location.href='/register.html'" class="text-sm text-[#800020] underline mt-2">Change Address</button>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4">
+            <h2 class="font-semibold text-lg mb-3">Payment Method</h2>
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 p-2 border rounded-lg cursor-pointer">
+                    <input type="radio" name="payment" value="orange-money" class="w-4 h-4 text-[#800020]">
+                    <i data-lucide="smartphone" class="w-5 h-5 text-orange-500"></i>
+                    <span>Orange Money</span>
+                </label>
+                <label class="flex items-center gap-3 p-2 border rounded-lg cursor-pointer">
+                    <input type="radio" name="payment" value="afri-money" class="w-4 h-4 text-[#800020]">
+                    <i data-lucide="smartphone" class="w-5 h-5 text-green-500"></i>
+                    <span>AfriMoney</span>
+                </label>
+                <label class="flex items-center gap-3 p-2 border rounded-lg cursor-pointer">
+                    <input type="radio" name="payment" value="visa" class="w-4 h-4 text-[#800020]">
+                    <i data-lucide="credit-card" class="w-5 h-5 text-blue-500"></i>
+                    <span>Visa / Mastercard</span>
+                </label>
+                <label class="flex items-center gap-3 p-2 border rounded-lg cursor-pointer">
+                    <input type="radio" name="payment" value="bank-transfer" class="w-4 h-4 text-[#800020]">
+                    <i data-lucide="building" class="w-5 h-5 text-gray-500"></i>
+                    <span>Bank Transfer (SLCB)</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Place Order Button -->
+        <button onclick="placeOrder()" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+            Place Order
+        </button>
+    </div>
+
+    <!-- Bottom navigation bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+        <div class="flex justify-around items-center py-2 max-w-md mx-auto">
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/'">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Home</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer">
+                <i data-lucide="search" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Search</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/cart.html'">
+                <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Cart</span>
+                <span id="cart-count" class="absolute text-xs bg-red-500 text-white rounded-full px-1 -mt-1 ml-3 hidden">0</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/chat.html'">
+                <i data-lucide="message-circle" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Chat</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/account.html'">
+                <i data-lucide="user" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Account</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let checkoutItems = [];
+        let orderTotal = 0;
+
+        // Check if user is logged in
+        function isLoggedIn() {
+            return localStorage.getItem('isLoggedIn') === 'true';
+        }
+
+        // Load checkout items
+        function loadCheckoutItems() {
+            // Check if coming from Buy Now
+            const buyNowItem = localStorage.getItem('buyNowItem');
+            if (buyNowItem) {
+                checkoutItems = [JSON.parse(buyNowItem)];
+                localStorage.removeItem('buyNowItem');
+            } else {
+                // Coming from cart
+                const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+                // Group items by id and size
+                const grouped = {};
+                cart.forEach(item => {
+                    const key = `${item.id}_${item.size}`;
+                    if (grouped[key]) {
+                        grouped[key].quantity++;
+                    } else {
+                        grouped[key] = { ...item, quantity: 1 };
+                    }
+                });
+                checkoutItems = Object.values(grouped);
+            }
+            
+            displayOrderSummary();
+        }
+
+        // Display order summary
+        function displayOrderSummary() {
+            const container = document.getElementById('order-items');
+            if (checkoutItems.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-4">Your cart is empty</div>';
+                return;
+            }
+            
+            orderTotal = checkoutItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            container.innerHTML = checkoutItems.map(item => `
+                <div class="flex justify-between text-sm">
+                    <span>${escapeHtml(item.name)} (${item.size}) x${item.quantity}</span>
+                    <span class="font-semibold">${(item.price * item.quantity).toLocaleString()} SLL</span>
+                </div>
+            `).join('');
+            
+            document.getElementById('order-total').innerHTML = `${orderTotal.toLocaleString()} SLL`;
+        }
+
+        // Load delivery address
+        function loadDeliveryAddress() {
+            const user = JSON.parse(localStorage.getItem('beinSalUser'));
+            if (user) {
+                const addressHtml = `
+                    <p><strong>${escapeHtml(user.fullName)}</strong></p>
+                    <p>${escapeHtml(user.phone)}</p>
+                    <p>${escapeHtml(user.street)}, ${escapeHtml(user.city)}</p>
+                    <p>${user.landmark ? `Landmark: ${escapeHtml(user.landmark)}` : ''}</p>
+                `;
+                document.getElementById('delivery-address').innerHTML = addressHtml;
+            } else {
+                document.getElementById('delivery-address').innerHTML = '<div class="text-red-500">No address found. Please update your profile.</div>';
+            }
+        }
+
+        // Place order
+        function placeOrder() {
+            const selectedPayment = document.querySelector('input[name="payment"]:checked');
+            if (!selectedPayment) {
+                alert('Please select a payment method');
+                return;
+            }
+            
+            if (checkoutItems.length === 0) {
+                alert('Your cart is empty');
+                return;
+            }
+            
+            const user = JSON.parse(localStorage.getItem('beinSalUser'));
+            if (!user) {
+                alert('Please update your delivery address');
+                window.location.href = '/register.html';
+                return;
+            }
+            
+            // Create order object
+            const order = {
+                orderId: 'ORD' + Date.now(),
+                date: new Date().toISOString(),
+                items: checkoutItems.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    price: item.price,
+                    size: item.size,
+                    quantity: item.quantity
+                })),
+                total: orderTotal,
+                paymentMethod: selectedPayment.value,
+                deliveryAddress: {
+                    fullName: user.fullName,
+                    phone: user.phone,
+                    city: user.city,
+                    street: user.street,
+                    landmark: user.landmark || ''
+                },
+                status: 'pending'
+            };
+            
+            // Save order to localStorage
+            let orders = JSON.parse(localStorage.getItem('beinSalOrders') || '[]');
+            orders.unshift(order); // Add to beginning (newest first)
+            localStorage.setItem('beinSalOrders', JSON.stringify(orders));
+            
+            // Clear cart
+            localStorage.setItem('cart', '[]');
+            
+            // Update cart count badge if visible elsewhere
+            if (typeof updateCartCount === 'function') {
+                updateCartCount();
+            }
+            
+            // Show success message
+            alert(`Order placed successfully!\nOrder ID: ${order.orderId}\nTotal: ${orderTotal.toLocaleString()} SLL\nPayment: ${selectedPayment.value}\n\nYou can view your order history in My Account.`);
+            
+            // Redirect to orders page
+            window.location.href = '/orders.html';
+        }
+
+        // Update cart count badge
+        function updateCartCount() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const count = cart.length;
+            const badge = document.getElementById('cart-count');
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Redirect to login if not logged in
+        function checkAuth() {
+            if (!isLoggedIn()) {
+                localStorage.setItem('redirectAfterLogin', '/checkout.html');
+                window.location.href = '/register.html';
+                return false;
+            }
+            return true;
+        }
+
+        // Initialize
+        if (checkAuth()) {
+            loadCheckoutItems();
+            loadDeliveryAddress();
+            updateCartCount();
+        }
+        
+        lucide.createIcons();
+    </script>
+</body>
+</html>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Admin Delivery Persons</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 pb-8">
+    <!-- Single line header with integrated navigation -->
+    <div class="bg-[#800020] text-white p-3 sticky top-0 z-10 shadow-md">
+        <div class="flex items-center justify-between max-w-6xl mx-auto flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="truck" class="w-5 h-5"></i>
+                <span class="font-bold">Manage Delivery Persons</span>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <button class="nav-tab hover:underline" data-page="dashboard">Dashboard</button>
+                <button class="nav-tab hover:underline" data-page="orders">Order Management</button>
+                <button class="nav-tab hover:underline" data-page="chat">Support Chat</button>
+                <button class="nav-tab hover:underline" data-page="delivery">Manage Delivery Persons</button>
+                <button class="nav-tab hover:underline" data-page="staff">Manage Staff</button>
+                <button class="nav-tab hover:underline" data-page="site">View Site</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="admin-name" class="text-sm">Loading...</span>
+                <button onclick="logout()" class="bg-white text-[#800020] px-2 py-1 rounded text-sm font-semibold">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6 max-w-4xl">
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-6">
+            <button id="tab-pending" class="px-4 py-2 rounded-lg font-semibold bg-[#800020] text-white">Pending Approvals</button>
+            <button id="tab-active" class="px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700">Active Delivery Persons</button>
+            <button id="tab-inactive" class="px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700">Inactive</button>
+        </div>
+
+        <!-- Pending Approvals Section -->
+        <div id="pending-section">
+            <h2 class="font-semibold text-lg mb-3">Pending Registration Requests</h2>
+            <div id="pending-container" class="space-y-3">
+                <div class="text-center text-gray-500 py-8">Loading pending requests...</div>
+            </div>
+        </div>
+
+        <!-- Active Delivery Persons Section (hidden initially) -->
+        <div id="active-section" class="hidden">
+            <h2 class="font-semibold text-lg mb-3">Active Delivery Persons</h2>
+            <div id="active-container" class="space-y-3">
+                <div class="text-center text-gray-500 py-8">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Inactive Section (hidden initially) -->
+        <div id="inactive-section" class="hidden">
+            <h2 class="font-semibold text-lg mb-3">Inactive Delivery Persons</h2>
+            <div id="inactive-container" class="space-y-3">
+                <div class="text-center text-gray-500 py-8">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let pendingDeliveries = [];
+        let activeDeliveries = [];
+        let inactiveDeliveries = [];
+        let currentStaffName = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('staffToken');
+            if (!token) {
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/staff/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                if (!result.valid) {
+                    localStorage.removeItem('staffToken');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                currentStaffName = result.full_name;
+                document.getElementById('admin-name').textContent = currentStaffName;
+                return true;
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+        }
+
+        // Navigate to different pages
+        function navigateTo(page) {
+            switch(page) {
+                case 'dashboard':
+                    window.location.href = '/admin/admin-dashboard.html';
+                    break;
+                case 'orders':
+                    window.location.href = '/admin/orders.html';
+                    break;
+                case 'chat':
+                    window.location.href = '/admin/support-chat.html';
+                    break;
+                case 'delivery':
+                    window.location.href = '/admin/manage-delivery-person.html';
+                    break;
+                case 'staff':
+                    window.location.href = '/admin/manage-staff.html';
+                    break;
+                case 'site':
+                    window.open('/', '_blank');
+                    break;
+            }
+        }
+
+        // Setup navigation tabs
+        function setupNavTabs() {
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const page = tab.getAttribute('data-page');
+                    navigateTo(page);
+                });
+            });
+        }
+
+        // Load all delivery persons from localStorage
+        function loadDeliveryPersons() {
+            let deliveries = JSON.parse(localStorage.getItem('beinSalDeliveries') || '[]');
+            
+            if (deliveries.length === 0) {
+                const pendingFromSession = localStorage.getItem('pendingDelivery');
+                if (pendingFromSession) {
+                    deliveries.push(JSON.parse(pendingFromSession));
+                    localStorage.removeItem('pendingDelivery');
+                }
+                localStorage.setItem('beinSalDeliveries', JSON.stringify(deliveries));
+            }
+            
+            pendingDeliveries = deliveries.filter(d => d.status === 'pending');
+            activeDeliveries = deliveries.filter(d => d.status === 'active');
+            inactiveDeliveries = deliveries.filter(d => d.status === 'inactive');
+            
+            displayPending();
+            displayActive();
+            displayInactive();
+        }
+
+        // Display pending requests
+        function displayPending() {
+            const container = document.getElementById('pending-container');
+            
+            if (pendingDeliveries.length === 0) {
+                container.innerHTML = '<div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">No pending requests</div>';
+                return;
+            }
+            
+            container.innerHTML = pendingDeliveries.map(d => {
+                const date = new Date(d.registeredAt).toLocaleDateString();
+                return `
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50">
+                            <p class="font-semibold">${escapeHtml(d.fullName)}</p>
+                            <p class="text-xs text-gray-500">Registered: ${date}</p>
+                        </div>
+                        <div class="p-4 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">Phone:</span>
+                                <span>${escapeHtml(d.phone)}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">National ID:</span>
+                                <span>${escapeHtml(d.nationalId)}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">Delivery Zone:</span>
+                                <span>${escapeHtml(d.deliveryZone)}</span>
+                            </div>
+                        </div>
+                        <div class="p-3 border-t bg-gray-50 flex gap-2">
+                            <button onclick="approveDelivery(${d.id})" class="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700">
+                                Approve
+                            </button>
+                            <button onclick="rejectDelivery(${d.id})" class="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700">
+                                Reject
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        // Display active delivery persons
+        function displayActive() {
+            const container = document.getElementById('active-container');
+            
+            if (activeDeliveries.length === 0) {
+                container.innerHTML = '<div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">No active delivery persons</div>';
+                return;
+            }
+            
+            container.innerHTML = activeDeliveries.map(d => {
+                const date = new Date(d.approvedAt).toLocaleDateString();
+                return `
+                    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50">
+                            <p class="font-semibold">${escapeHtml(d.fullName)}</p>
+                            <p class="text-xs text-gray-500">Approved: ${date}</p>
+                        </div>
+                        <div class="p-4 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">Phone:</span>
+                                <span>${escapeHtml(d.phone)}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">Zone:</span>
+                                <span>${escapeHtml(d.deliveryZone)}</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-500">PIN:</span>
+                                <span class="font-mono">${d.pin}</span>
+                                <button onclick="copyPin('${d.pin}')" class="text-xs text-[#800020] underline">Copy</button>
+                            </div>
+                        </div>
+                        <div class="p-3 border-t bg-gray-50">
+                            <button onclick="deactivateDelivery(${d.id})" class="w-full bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700">
+                                Deactivate
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        // Display inactive delivery persons
+        function displayInactive() {
+            const container = document.getElementById('inactive-container');
+            
+            if (inactiveDeliveries.length === 0) {
+                container.innerHTML = '<div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">No inactive delivery persons</div>';
+                return;
+            }
+            
+            container.innerHTML = inactiveDeliveries.map(d => `
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="p-4 border-b bg-gray-50">
+                        <p class="font-semibold">${escapeHtml(d.fullName)}</p>
+                        <p class="text-xs text-gray-500">Phone: ${escapeHtml(d.phone)}</p>
+                    </div>
+                    <div class="p-4">
+                        <p class="text-sm text-gray-500">Zone: ${escapeHtml(d.deliveryZone)}</p>
+                    </div>
+                    <div class="p-3 border-t bg-gray-50">
+                        <button onclick="reactivateDelivery(${d.id})" class="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700">
+                            Reactivate
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            lucide.createIcons();
+        }
+
+        // Approve delivery person
+        function approveDelivery(id) {
+            const delivery = pendingDeliveries.find(d => d.id === id);
+            if (!delivery) return;
+            
+            const pin = Math.floor(100000 + Math.random() * 900000).toString();
+            
+            delivery.status = 'active';
+            delivery.pin = pin;
+            delivery.approvedAt = new Date().toISOString();
+            
+            let allDeliveries = JSON.parse(localStorage.getItem('beinSalDeliveries') || '[]');
+            const index = allDeliveries.findIndex(d => d.id === id);
+            if (index !== -1) {
+                allDeliveries[index] = delivery;
+                localStorage.setItem('beinSalDeliveries', JSON.stringify(allDeliveries));
+            }
+            
+            console.log(`[SIMULATED SMS] To ${delivery.phone}: Your BeinSal delivery account has been approved. Your PIN is: ${pin}`);
+            alert(`Delivery person approved!\nPIN: ${pin}\n(Check console for simulated SMS)`);
+            
+            loadDeliveryPersons();
+        }
+
+        // Reject delivery person
+        function rejectDelivery(id) {
+            if (confirm('Are you sure you want to reject this registration?')) {
+                let allDeliveries = JSON.parse(localStorage.getItem('beinSalDeliveries') || '[]');
+                allDeliveries = allDeliveries.filter(d => d.id !== id);
+                localStorage.setItem('beinSalDeliveries', JSON.stringify(allDeliveries));
+                loadDeliveryPersons();
+                alert('Registration rejected and removed.');
+            }
+        }
+
+        // Deactivate delivery person
+        function deactivateDelivery(id) {
+            if (confirm('Deactivate this delivery person? They will no longer be able to log in.')) {
+                let allDeliveries = JSON.parse(localStorage.getItem('beinSalDeliveries') || '[]');
+                const index = allDeliveries.findIndex(d => d.id === id);
+                if (index !== -1) {
+                    allDeliveries[index].status = 'inactive';
+                    localStorage.setItem('beinSalDeliveries', JSON.stringify(allDeliveries));
+                    loadDeliveryPersons();
+                    alert('Delivery person deactivated.');
+                }
+            }
+        }
+
+        // Reactivate delivery person
+        function reactivateDelivery(id) {
+            let allDeliveries = JSON.parse(localStorage.getItem('beinSalDeliveries') || '[]');
+            const index = allDeliveries.findIndex(d => d.id === id);
+            if (index !== -1) {
+                allDeliveries[index].status = 'active';
+                localStorage.setItem('beinSalDeliveries', JSON.stringify(allDeliveries));
+                loadDeliveryPersons();
+                alert('Delivery person reactivated.');
+            }
+        }
+
+        // Copy PIN to clipboard
+        function copyPin(pin) {
+            navigator.clipboard.writeText(pin);
+            alert('PIN copied to clipboard');
+        }
+
+        // Tab switching
+        function setupTabs() {
+            const tabPending = document.getElementById('tab-pending');
+            const tabActive = document.getElementById('tab-active');
+            const tabInactive = document.getElementById('tab-inactive');
+            const pendingSection = document.getElementById('pending-section');
+            const activeSection = document.getElementById('active-section');
+            const inactiveSection = document.getElementById('inactive-section');
+            
+            tabPending.addEventListener('click', () => {
+                tabPending.className = 'px-4 py-2 rounded-lg font-semibold bg-[#800020] text-white';
+                tabActive.className = 'px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700';
+                tabInactive.className = 'px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700';
+                pendingSection.classList.remove('hidden');
+                activeSection.classList.add('hidden');
+                inactiveSection.classList.add('hidden');
+            });
+            
+            tabActive.addEventListener('click', () => {
+                tabActive.className = 'px-4 py-2 rounded-lg font-semibold bg-[#800020] text-white';
+                tabPending.className = 'px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700';
+                tabInactive.className = 'px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700';
+                activeSection.classList.remove('hidden');
+                pendingSection.classList.add('hidden');
+                inactiveSection.classList.add('hidden');
+            });
+            
+            tabInactive.addEventListener('click', () => {
+                tabInactive.className = 'px-4 py-2 rounded-lg font-semibold bg-[#800020] text-white';
+                tabPending.className = 'px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700';
+                tabActive.className = 'px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700';
+                inactiveSection.classList.remove('hidden');
+                pendingSection.classList.add('hidden');
+                activeSection.classList.add('hidden');
+            });
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('staffToken');
+                localStorage.removeItem('staffName');
+                localStorage.removeItem('staffRole');
+                window.location.href = '/admin/staff-login.html';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        async function init() {
+            const authorized = await checkAuth();
+            if (authorized) {
+                loadDeliveryPersons();
+                setupTabs();
+                setupNavTabs();
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - My Account</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 pb-24">
+    <!-- Maroon header bar -->
+    <div class="bg-[#800020] text-white p-4 sticky top-0 z-10 shadow-md">
+        <h1 class="text-xl font-bold text-center">My Account</h1>
+    </div>
+
+    <div class="container mx-auto px-4 py-4 max-w-md">
+        <!-- User Profile Card -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-4 flex items-center gap-4">
+            <div class="w-16 h-16 bg-[#800020] rounded-full flex items-center justify-center">
+                <i data-lucide="user" class="w-8 h-8 text-white"></i>
+            </div>
+            <div class="flex-1">
+                <h2 id="user-name" class="font-bold text-lg">Loading...</h2>
+                <p id="user-phone" class="text-sm text-gray-500">Loading...</p>
+                <button onclick="editProfile()" class="text-xs text-[#800020] underline mt-1">Edit Profile</button>
+            </div>
+        </div>
+
+        <!-- My Orders Section -->
+        <div class="bg-white rounded-lg shadow-md mb-4 overflow-hidden">
+            <div class="p-4 border-b flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="package" class="w-5 h-5 text-[#800020]"></i>
+                    <span class="font-semibold">My Orders</span>
+                </div>
+                <button onclick="viewAllOrders()" class="text-xs text-gray-500">View All ></button>
+            </div>
+            <div class="flex justify-around py-4">
+                <div class="flex flex-col items-center gap-1" onclick="filterOrders('pending')">
+                    <i data-lucide="clock" class="w-6 h-6 text-gray-500"></i>
+                    <span class="text-xs">Pending</span>
+                </div>
+                <div class="flex flex-col items-center gap-1" onclick="filterOrders('processing')">
+                    <i data-lucide="package" class="w-6 h-6 text-gray-500"></i>
+                    <span class="text-xs">To Ship</span>
+                </div>
+                <div class="flex flex-col items-center gap-1" onclick="filterOrders('shipped')">
+                    <i data-lucide="truck" class="w-6 h-6 text-gray-500"></i>
+                    <span class="text-xs">To Receive</span>
+                </div>
+                <div class="flex flex-col items-center gap-1" onclick="filterOrders('delivered')">
+                    <i data-lucide="star" class="w-6 h-6 text-gray-500"></i>
+                    <span class="text-xs">To Review</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Menu Items (Pinduoduo style) -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-4">
+            <div class="divide-y">
+                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onclick="goToWallet()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="wallet" class="w-5 h-5 text-[#800020]"></i>
+                        <span>My Wallet</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="wallet-balance" class="text-sm text-gray-500">SLL 0</span>
+                        <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onclick="goToFavorites()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="heart" class="w-5 h-5 text-[#800020]"></i>
+                        <span>Favorites</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                </div>
+                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onclick="goToRecentlyViewed()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="history" class="w-5 h-5 text-[#800020]"></i>
+                        <span>Recently Viewed</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                </div>
+                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onclick="goToAddress()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="map-pin" class="w-5 h-5 text-[#800020]"></i>
+                        <span>Delivery Address</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                </div>
+                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onclick="goToCustomerService()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="message-circle" class="w-5 h-5 text-[#800020]"></i>
+                        <span>Customer Service</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                </div>
+                <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" onclick="goToSettings()">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="settings" class="w-5 h-5 text-[#800020]"></i>
+                        <span>Settings</span>
+                    </div>
+                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Promo Banner (like Pinduoduo) -->
+        <div class="bg-gradient-to-r from-[#800020] to-[#a00028] rounded-lg p-4 mb-4 text-white">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-sm">618 Mid-Year Sale</p>
+                    <p class="text-xs opacity-80">Limited time offers</p>
+                </div>
+                <button class="bg-white text-[#800020] px-4 py-1 rounded-full text-sm font-semibold">Claim</button>
+            </div>
+        </div>
+
+        <!-- Logout Button -->
+        <button onclick="logout()" class="w-full bg-red-500 text-white py-3 rounded-lg font-semibold hover:bg-red-600 transition">
+            Logout
+        </button>
+    </div>
+
+    <!-- Bottom navigation bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+        <div class="flex justify-around items-center py-2 max-w-md mx-auto">
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/'">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Home</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer">
+                <i data-lucide="search" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Search</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/cart.html'">
+                <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Cart</span>
+                <span id="cart-count" class="absolute text-xs bg-red-500 text-white rounded-full px-1 -mt-1 ml-3 hidden">0</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/customer-chat.html'">
+                <i data-lucide="message-circle" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Chat</span>
+            </div>
+            <div class="flex flex-col items-center text-[#800020] cursor-pointer" onclick="window.location.href='/account.html'">
+                <i data-lucide="user" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Account</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal (hidden by default) -->
+    <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg w-full max-w-md">
+            <div class="p-4 border-b">
+                <h3 class="font-bold text-lg">Edit Profile</h3>
+            </div>
+            <div class="p-4 space-y-3">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Full Name</label>
+                    <input type="text" id="edit-full-name" class="w-full border rounded-lg p-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Phone Number</label>
+                    <input type="tel" id="edit-phone" class="w-full border rounded-lg p-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Region / City</label>
+                    <input type="text" id="edit-city" class="w-full border rounded-lg p-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Street Address</label>
+                    <input type="text" id="edit-street" class="w-full border rounded-lg p-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Landmark</label>
+                    <input type="text" id="edit-landmark" class="w-full border rounded-lg p-2">
+                </div>
+            </div>
+            <div class="p-4 border-t flex gap-3">
+                <button onclick="closeEditModal()" class="flex-1 bg-gray-200 py-2 rounded-lg">Cancel</button>
+                <button onclick="saveProfile()" class="flex-1 bg-[#800020] text-white py-2 rounded-lg">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        let currentUser = null;
+        
+        // Check if user is logged in
+        function isLoggedIn() {
+            return localStorage.getItem('isLoggedIn') === 'true';
+        }
+        
+        // Load user data
+        function loadUserData() {
+            const userStr = localStorage.getItem('beinSalUser');
+            if (userStr) {
+                currentUser = JSON.parse(userStr);
+                document.getElementById('user-name').textContent = currentUser.fullName || 'Customer';
+                document.getElementById('user-phone').textContent = currentUser.phone || '';
+            } else {
+                document.getElementById('user-name').textContent = 'Guest User';
+                document.getElementById('user-phone').textContent = 'Please register';
+            }
+        }
+        
+        // Edit profile
+        function editProfile() {
+            if (!currentUser) {
+                alert('Please login first');
+                window.location.href = '/register.html';
+                return;
+            }
+            
+            document.getElementById('edit-full-name').value = currentUser.fullName || '';
+            document.getElementById('edit-phone').value = currentUser.phone || '';
+            document.getElementById('edit-city').value = currentUser.city || '';
+            document.getElementById('edit-street').value = currentUser.street || '';
+            document.getElementById('edit-landmark').value = currentUser.landmark || '';
+            
+            document.getElementById('edit-profile-modal').classList.remove('hidden');
+            document.getElementById('edit-profile-modal').classList.add('flex');
+        }
+        
+        function closeEditModal() {
+            document.getElementById('edit-profile-modal').classList.add('hidden');
+            document.getElementById('edit-profile-modal').classList.remove('flex');
+        }
+        
+        function saveProfile() {
+            const updatedUser = {
+                fullName: document.getElementById('edit-full-name').value.trim(),
+                phone: document.getElementById('edit-phone').value.trim(),
+                city: document.getElementById('edit-city').value.trim(),
+                street: document.getElementById('edit-street').value.trim(),
+                landmark: document.getElementById('edit-landmark').value.trim(),
+                registeredAt: currentUser.registeredAt
+            };
+            
+            if (!updatedUser.fullName || !updatedUser.phone || !updatedUser.city || !updatedUser.street) {
+                alert('Please fill all required fields');
+                return;
+            }
+            
+            // Save updated user to localStorage (will sync with database later)
+            localStorage.setItem('beinSalUser', JSON.stringify(updatedUser));
+            currentUser = updatedUser;
+            
+            // Update display
+            document.getElementById('user-name').textContent = updatedUser.fullName;
+            document.getElementById('user-phone').textContent = updatedUser.phone;
+            
+            closeEditModal();
+            alert('Profile updated successfully!');
+        }
+        
+        // Navigation functions
+        function viewAllOrders() {
+            window.location.href = '/orders.html';
+        }
+        
+        function filterOrders(status) {
+            localStorage.setItem('orderFilter', status);
+            window.location.href = '/orders.html';
+        }
+        
+        function goToWallet() {
+            alert('Wallet feature coming soon. You can pay with Orange Money, AfriMoney, Visa, or Bank Transfer at checkout.');
+        }
+        
+        function goToFavorites() {
+            alert('Favorites feature coming soon. Save your favorite products for later.');
+        }
+        
+        function goToRecentlyViewed() {
+            window.location.href = '/';
+            setTimeout(() => {
+                document.getElementById('recently-viewed').scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+        
+        function goToAddress() {
+            editProfile();
+        }
+        
+        function goToCustomerService() {
+            window.location.href = '/customer-chat.html';
+        }
+        
+        function goToSettings() {
+            alert('Settings: Notification preferences, Language, Privacy settings coming soon.');
+        }
+        
+        // Update cart count
+        function updateCartCount() {
+            const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const count = cart.length;
+            const badge = document.getElementById('cart-count');
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+        
+        // Load wallet balance from localStorage
+        function loadWalletBalance() {
+            let balance = localStorage.getItem('beinSalWallet');
+            if (!balance) {
+                balance = '0';
+                localStorage.setItem('beinSalWallet', '0');
+            }
+            document.getElementById('wallet-balance').textContent = `SLL ${parseInt(balance).toLocaleString()}`;
+        }
+        
+        // Logout
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('beinSalToken');
+                localStorage.removeItem('isLoggedIn');
+                localStorage.removeItem('beinSalUser');
+                window.location.href = '/';
+            }
+        }
+        
+        // Redirect to login if not logged in
+        function checkAuth() {
+            if (!isLoggedIn()) {
+                localStorage.setItem('redirectAfterLogin', '/account.html');
+                window.location.href = '/register.html';
+                return false;
+            }
+            return true;
+        }
+        
+        // Initialize
+        if (checkAuth()) {
+            loadUserData();
+            updateCartCount();
+            loadWalletBalance();
+        }
+        
+        // Re-initialize icons after any DOM updates
+        setTimeout(() => lucide.createIcons(), 100);
+    </script>
+</body>
+</html>

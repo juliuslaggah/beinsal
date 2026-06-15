@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Cart</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 pb-24">
+    <!-- Maroon header bar with back button -->
+    <div class="bg-[#800020] text-white p-4 sticky top-0 z-10 shadow-md flex items-center gap-4">
+        <button onclick="window.location.href='/'" class="text-white">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <h1 class="text-xl font-bold flex-1 text-center">My Cart</h1>
+        <div class="w-5"></div>
+    </div>
+
+    <div class="container mx-auto px-4 py-4 max-w-md">
+        <!-- Cart Items Container -->
+        <div id="cart-container" class="space-y-3">
+            <div class="text-center text-gray-500 py-8">Loading cart...</div>
+        </div>
+
+        <!-- Empty Cart Message (hidden by default) -->
+        <div id="empty-cart" class="text-center py-12 hidden">
+            <i data-lucide="shopping-cart" class="w-16 h-16 text-gray-300 mx-auto mb-3"></i>
+            <p class="text-gray-500 mb-4">Your cart is empty</p>
+            <button onclick="window.location.href='/'" class="bg-[#800020] text-white px-6 py-2 rounded-lg">
+                Continue Shopping
+            </button>
+        </div>
+
+        <!-- Cart Summary (hidden if cart empty) -->
+        <div id="cart-summary" class="bg-white rounded-lg shadow-md p-4 mt-4 hidden">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-gray-600">Subtotal</span>
+                <span id="subtotal" class="font-semibold">0 SLL</span>
+            </div>
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-600">Shipping</span>
+                <span id="shipping" class="text-green-600">Calculated at checkout</span>
+            </div>
+            <div class="border-t pt-3 mb-4">
+                <div class="flex justify-between items-center">
+                    <span class="font-bold text-lg">Total</span>
+                    <span id="total" class="font-bold text-lg text-[#800020]">0 SLL</span>
+                </div>
+            </div>
+            <button onclick="checkout()" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                Proceed to Checkout
+            </button>
+        </div>
+    </div>
+
+    <!-- Bottom navigation bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+        <div class="flex justify-around items-center py-2 max-w-md mx-auto">
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/'">
+                <i data-lucide="home" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Home</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer">
+                <i data-lucide="search" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Search</span>
+            </div>
+            <div class="flex flex-col items-center text-[#800020] cursor-pointer" onclick="window.location.href='/cart.html'">
+                <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Cart</span>
+                <span id="cart-count" class="absolute text-xs bg-red-500 text-white rounded-full px-1 -mt-1 ml-3 hidden">0</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/chat.html'">
+                <i data-lucide="message-circle" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Chat</span>
+            </div>
+            <div class="flex flex-col items-center text-gray-500 cursor-pointer" onclick="window.location.href='/account.html'">
+                <i data-lucide="user" class="w-5 h-5"></i>
+                <span class="text-xs mt-1">Account</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let cartItems = [];
+        let allProducts = [];
+
+        // Load all products from server
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products');
+                allProducts = await response.json();
+                loadCart();
+            } catch (error) {
+                console.error('Error loading products:', error);
+                document.getElementById('cart-container').innerHTML = '<div class="text-center text-red-500 py-8">Failed to load cart. Please refresh.</div>';
+            }
+        }
+
+        // Load cart from localStorage and group by id and size
+        function loadCart() {
+            const rawCart = JSON.parse(localStorage.getItem('cart') || '[]');
+            
+            // Group items by id and size
+            const grouped = {};
+            rawCart.forEach(item => {
+                const key = `${item.id}_${item.size}`;
+                if (grouped[key]) {
+                    grouped[key].quantity++;
+                } else {
+                    grouped[key] = {
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        size: item.size,
+                        quantity: 1
+                    };
+                }
+            });
+            
+            cartItems = Object.values(grouped);
+            
+            if (cartItems.length === 0) {
+                showEmptyCart();
+            } else {
+                displayCart();
+                updateSummary();
+            }
+            
+            updateCartCount();
+        }
+
+        // Display cart items
+        function displayCart() {
+            const container = document.getElementById('cart-container');
+            
+            container.innerHTML = cartItems.map((item, index) => `
+                <div class="bg-white rounded-lg shadow-md p-3 flex gap-3">
+                    <!-- Product Image Placeholder -->
+                    <div class="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="shopping-bag" class="w-8 h-8 text-gray-400"></i>
+                    </div>
+                    
+                    <!-- Product Details -->
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-sm">${escapeHtml(item.name)}</h3>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs text-gray-500">Size: ${item.size}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <div class="flex items-center gap-2">
+                                <button onclick="updateQuantity(${index}, -1)" class="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100">
+                                    <i data-lucide="minus" class="w-3 h-3"></i>
+                                </button>
+                                <span class="w-8 text-center text-sm">${item.quantity}</span>
+                                <button onclick="updateQuantity(${index}, 1)" class="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100">
+                                    <i data-lucide="plus" class="w-3 h-3"></i>
+                                </button>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold text-[#800020]">${(item.price * item.quantity).toLocaleString()} SLL</p>
+                                <p class="text-xs text-gray-400">${item.price.toLocaleString()} SLL each</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Remove Button -->
+                    <button onclick="removeItem(${index})" class="text-gray-400 hover:text-red-500 self-start">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            `).join('');
+            
+            // Show summary and hide empty message
+            document.getElementById('cart-container').classList.remove('hidden');
+            document.getElementById('empty-cart').classList.add('hidden');
+            document.getElementById('cart-summary').classList.remove('hidden');
+            
+            lucide.createIcons();
+        }
+
+        // Show empty cart message
+        function showEmptyCart() {
+            document.getElementById('cart-container').classList.add('hidden');
+            document.getElementById('empty-cart').classList.remove('hidden');
+            document.getElementById('cart-summary').classList.add('hidden');
+        }
+
+        // Update item quantity
+        function updateQuantity(index, change) {
+            const item = cartItems[index];
+            const newQuantity = item.quantity + change;
+            
+            if (newQuantity < 1) {
+                removeItem(index);
+                return;
+            }
+            
+            item.quantity = newQuantity;
+            
+            // Update localStorage
+            updateLocalStorage();
+            
+            // Refresh display
+            displayCart();
+            updateSummary();
+            updateCartCount();
+        }
+
+        // Remove item from cart
+        function removeItem(index) {
+            cartItems.splice(index, 1);
+            updateLocalStorage();
+            
+            if (cartItems.length === 0) {
+                showEmptyCart();
+            } else {
+                displayCart();
+                updateSummary();
+            }
+            updateCartCount();
+        }
+
+        // Update localStorage to match current cartItems
+        function updateLocalStorage() {
+            const newCart = [];
+            cartItems.forEach(item => {
+                for (let i = 0; i < item.quantity; i++) {
+                    newCart.push({
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        size: item.size
+                    });
+                }
+            });
+            localStorage.setItem('cart', JSON.stringify(newCart));
+        }
+
+        // Update cart summary (subtotal, total)
+        function updateSummary() {
+            const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            document.getElementById('subtotal').innerHTML = `${subtotal.toLocaleString()} SLL`;
+            document.getElementById('total').innerHTML = `${subtotal.toLocaleString()} SLL`;
+        }
+
+        // Update cart count badge
+        function updateCartCount() {
+            const rawCart = JSON.parse(localStorage.getItem('cart') || '[]');
+            const count = rawCart.length;
+            const badge = document.getElementById('cart-count');
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Proceed to checkout
+        function checkout() {
+            if (cartItems.length === 0) {
+                alert('Your cart is empty');
+                return;
+            }
+            
+            // Clear any existing buyNowItem
+            localStorage.removeItem('buyNowItem');
+            
+            // Redirect to checkout
+            window.location.href = '/checkout.html';
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        loadProducts();
+    </script>
+</body>
+</html>

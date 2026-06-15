@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Delivery Registration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <div class="bg-[#800020] text-white p-4">
+        <h1 class="text-xl font-bold text-center">Delivery Person Registration</h1>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-md">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="text-center mb-6">
+                <i data-lucide="truck" class="w-12 h-12 text-[#800020] mx-auto mb-2"></i>
+                <h2 class="text-xl font-bold">Become a Delivery Partner</h2>
+                <p class="text-gray-500 text-sm mt-1">Register to deliver orders for BeinSal</p>
+            </div>
+
+            <form id="registration-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Full Name *</label>
+                    <input type="text" id="full-name" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Phone Number *</label>
+                    <input type="tel" id="phone" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]" placeholder="076 123 456">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">National ID Number *</label>
+                    <input type="text" id="national-id" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]" placeholder="e.g., 123456789">
+                    <p class="text-xs text-gray-400 mt-1">For verification purposes</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Delivery Zone / Area *</label>
+                    <select id="delivery-zone" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]">
+                        <option value="">Select your delivery zone</option>
+                        <option value="Freetown Central">Freetown Central</option>
+                        <option value="Freetown East">Freetown East</option>
+                        <option value="Freetown West">Freetown West</option>
+                        <option value="Makeni">Makeni</option>
+                        <option value="Bo">Bo</option>
+                        <option value="Kenema">Kenema</option>
+                        <option value="Other">Other (Specify)</option>
+                    </select>
+                </div>
+
+                <div id="other-zone-container" class="hidden">
+                    <label class="block text-sm font-medium mb-1">Specify Zone</label>
+                    <input type="text" id="other-zone" class="w-full border rounded-lg p-2">
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700">
+                    <i data-lucide="info" class="w-4 h-4 inline mr-1"></i>
+                    Your registration will be reviewed by admin. Upon approval, you will receive a PIN to access the delivery dashboard.
+                </div>
+
+                <button type="submit" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                    Submit Registration
+                </button>
+            </form>
+
+            <div class="text-center mt-4">
+                <p class="text-sm text-gray-500">Already have an account?</p>
+                <a href="/delivery/login.html" class="text-[#800020] underline text-sm">Login here</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Show other zone input when "Other" is selected
+        const zoneSelect = document.getElementById('delivery-zone');
+        const otherZoneContainer = document.getElementById('other-zone-container');
+        
+        zoneSelect.addEventListener('change', () => {
+            if (zoneSelect.value === 'Other') {
+                otherZoneContainer.classList.remove('hidden');
+            } else {
+                otherZoneContainer.classList.add('hidden');
+            }
+        });
+
+        // Handle form submission
+        document.getElementById('registration-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fullName = document.getElementById('full-name').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const nationalId = document.getElementById('national-id').value.trim();
+            let deliveryZone = zoneSelect.value;
+            
+            if (deliveryZone === 'Other') {
+                const otherZone = document.getElementById('other-zone').value.trim();
+                if (!otherZone) {
+                    alert('Please specify your delivery zone');
+                    return;
+                }
+                deliveryZone = otherZone;
+            }
+            
+            if (!fullName || !phone || !nationalId || !deliveryZone) {
+                alert('Please fill all required fields');
+                return;
+            }
+            
+            // Validate phone number (basic)
+            if (!phone.match(/^[0-9]{6,12}$/)) {
+                alert('Please enter a valid phone number');
+                return;
+            }
+            
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            try {
+                const response = await fetch('/api/delivery/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fullName: fullName,
+                        phone: phone,
+                        nationalId: nationalId,
+                        deliveryZone: deliveryZone
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert('Registration submitted successfully!\n\nYour application is pending admin approval. You will receive SMS with your login PIN once approved.');
+                    window.location.href = '/delivery/login.html';
+                } else {
+                    alert(result.error || 'Registration failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                alert('Network error. Please check your connection and try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Registration';
+            }
+        });
+    </script>
+</body>
+</html>
+

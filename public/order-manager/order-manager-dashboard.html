@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Order Manager Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .status-pending { background-color: #fef3c7; color: #d97706; }
+        .status-processing { background-color: #dbeafe; color: #2563eb; }
+        .status-shipped { background-color: #e0e7ff; color: #4f46e5; }
+        .status-delivered { background-color: #d1fae5; color: #059669; }
+        .status-cancelled { background-color: #fee2e2; color: #dc2626; }
+        .nav-tab-active {
+            border-bottom: 2px solid #800020;
+            color: #800020;
+            font-weight: 600;
+        }
+        .nav-tab-inactive {
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 pb-8">
+    <!-- Header -->
+    <div class="bg-[#800020] text-white p-4 sticky top-0 z-10 shadow-md">
+        <div class="flex items-center justify-between max-w-6xl mx-auto">
+            <div class="flex items-center gap-3">
+                <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                <h1 class="text-xl font-bold">Order Manager Dashboard</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="manager-name" class="text-sm">Loading...</span>
+                <button onclick="logout()" class="bg-white text-[#800020] px-3 py-1 rounded-lg text-sm font-semibold">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Navigation Tabs (Filters) -->
+    <div class="bg-white border-b border-gray-200 sticky top-[72px] z-10">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex space-x-6 overflow-x-auto">
+                <button class="nav-tab py-3 px-1 text-sm font-medium nav-tab-active" data-filter="all">All Orders</button>
+                <button class="nav-tab py-3 px-1 text-sm font-medium nav-tab-inactive" data-filter="pending">Pending</button>
+                <button class="nav-tab py-3 px-1 text-sm font-medium nav-tab-inactive" data-filter="processing">Processing</button>
+                <button class="nav-tab py-3 px-1 text-sm font-medium nav-tab-inactive" data-filter="shipped">Shipped</button>
+                <button class="nav-tab py-3 px-1 text-sm font-medium nav-tab-inactive" data-filter="delivered">Delivered</button>
+                <button class="nav-tab py-3 px-1 text-sm font-medium nav-tab-inactive" data-filter="cancelled">Cancelled</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <!-- Welcome Card -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-[#800020] rounded-full flex items-center justify-center">
+                    <i data-lucide="user" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h2 id="welcome-message" class="font-bold text-lg">Welcome back!</h2>
+                    <p class="text-sm text-gray-500">Manage orders, update status, and generate delivery codes.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards (visible only on All Orders tab) -->
+        <div id="stats-container" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-[#800020]" id="total-orders">0</p>
+                <p class="text-xs text-gray-500">Total Orders</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-yellow-600" id="pending-orders">0</p>
+                <p class="text-xs text-gray-500">Pending</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-blue-600" id="processing-orders">0</p>
+                <p class="text-xs text-gray-500">Processing</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-indigo-600" id="shipped-orders">0</p>
+                <p class="text-xs text-gray-500">Shipped</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-green-600" id="delivered-orders">0</p>
+                <p class="text-xs text-gray-500">Delivered</p>
+            </div>
+        </div>
+
+        <!-- Orders List (hidden on All Orders tab) -->
+        <div id="orders-container" class="space-y-3">
+            <div class="text-center text-gray-500 py-8">Select a filter to view orders</div>
+        </div>
+    </div>
+
+    <!-- Update Status Modal -->
+    <div id="status-modal" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg w-full max-w-sm">
+            <div class="p-4 border-b">
+                <h3 class="font-bold text-lg">Update Order Status</h3>
+            </div>
+            <div class="p-4">
+                <p class="text-sm text-gray-600 mb-3">Order ID: <span id="status-order-id" class="font-mono"></span></p>
+                <label class="block text-sm font-medium mb-2">New Status</label>
+                <select id="new-status" class="w-full border rounded-lg p-2 mb-4">
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <div id="delivery-code-section" class="mb-4 hidden">
+                    <label class="block text-sm font-medium mb-2">Delivery Code (for customer)</label>
+                    <div class="bg-gray-100 p-3 rounded-lg text-center">
+                        <span id="delivery-code-display" class="font-mono text-xl font-bold tracking-wider"></span>
+                        <button onclick="copyDeliveryCode()" class="ml-2 text-xs bg-[#800020] text-white px-2 py-1 rounded">Copy</button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Share this code with the delivery person</p>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closeStatusModal()" class="flex-1 bg-gray-200 py-2 rounded-lg">Cancel</button>
+                    <button onclick="updateOrderStatus()" class="flex-1 bg-[#800020] text-white py-2 rounded-lg">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let allOrders = [];
+        let currentFilter = 'all';
+        let selectedOrderId = null;
+        let currentDeliveryCode = null;
+        let currentStaffName = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('staffToken');
+            if (!token) {
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/staff/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                if (!result.valid) {
+                    localStorage.removeItem('staffToken');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                if (result.role !== 'order_manager' && result.role !== 'admin') {
+                    alert('Access denied. Order Manager privileges required.');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                currentStaffName = result.full_name;
+                document.getElementById('manager-name').textContent = currentStaffName;
+                document.getElementById('welcome-message').textContent = `Welcome back, ${currentStaffName}!`;
+                
+                return true;
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+        }
+
+        function generateDeliveryCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        function loadOrders() {
+            const savedOrders = localStorage.getItem('beinSalOrders');
+            if (savedOrders) {
+                allOrders = JSON.parse(savedOrders);
+                allOrders.sort((a, b) => new Date(b.date) - new Date(a.date));
+            } else {
+                allOrders = [];
+            }
+            
+            updateStats();
+            filterAndDisplayOrders();
+        }
+
+        function updateStats() {
+            const total = allOrders.length;
+            const pending = allOrders.filter(o => o.status === 'pending').length;
+            const processing = allOrders.filter(o => o.status === 'processing').length;
+            const shipped = allOrders.filter(o => o.status === 'shipped').length;
+            const delivered = allOrders.filter(o => o.status === 'delivered').length;
+            
+            document.getElementById('total-orders').textContent = total;
+            document.getElementById('pending-orders').textContent = pending;
+            document.getElementById('processing-orders').textContent = processing;
+            document.getElementById('shipped-orders').textContent = shipped;
+            document.getElementById('delivered-orders').textContent = delivered;
+        }
+
+        function filterAndDisplayOrders() {
+            // Show/hide stats container and orders container based on current filter
+            const statsContainer = document.getElementById('stats-container');
+            const ordersContainer = document.getElementById('orders-container');
+            
+            if (currentFilter === 'all') {
+                // All Orders tab: Show stats cards, hide order list
+                statsContainer.classList.remove('hidden');
+                ordersContainer.innerHTML = '<div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">Select a filter (Pending, Processing, Shipped, Delivered, Cancelled) to view orders</div>';
+            } else {
+                // Other tabs: Hide stats cards, show filtered order list
+                statsContainer.classList.add('hidden');
+                
+                let filteredOrders = allOrders.filter(order => order.status === currentFilter);
+                
+                if (filteredOrders.length === 0) {
+                    ordersContainer.innerHTML = '<div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">No orders found</div>';
+                } else {
+                    displayOrders(filteredOrders);
+                }
+            }
+        }
+
+        function displayOrders(orders) {
+            const container = document.getElementById('orders-container');
+            
+            container.innerHTML = orders.map(order => {
+                const statusClass = getStatusClass(order.status);
+                const statusText = getStatusText(order.status);
+                const date = new Date(order.date).toLocaleDateString();
+                const time = new Date(order.date).toLocaleTimeString();
+                const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow overflow-hidden">
+                        <div class="p-4 border-b bg-gray-50 flex flex-wrap justify-between items-center gap-2">
+                            <div>
+                                <p class="font-mono text-sm font-semibold">${order.orderId}</p>
+                                <p class="text-xs text-gray-500">${date} at ${time}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${statusText}</span>
+                                <button onclick="openStatusModal('${order.orderId}', '${order.status}', '${order.deliveryCode || ''}')" class="text-xs bg-[#800020] text-white px-2 py-1 rounded hover:bg-[#a00028]">
+                                    Update
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <p class="font-semibold">${escapeHtml(order.deliveryAddress.fullName)}</p>
+                                    <p class="text-xs text-gray-500">${escapeHtml(order.deliveryAddress.phone)}</p>
+                                    <p class="text-xs text-gray-500">${escapeHtml(order.deliveryAddress.street)}, ${escapeHtml(order.deliveryAddress.city)}</p>
+                                </div>
+                                <p class="font-bold text-[#800020]">${order.total.toLocaleString()} SLL</p>
+                            </div>
+                            ${order.status === 'shipped' && order.deliveryCode ? `
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-2">
+                                    <p class="text-xs text-blue-700 font-semibold">Delivery Code</p>
+                                    <p class="font-mono text-lg font-bold">${order.deliveryCode}</p>
+                                </div>
+                            ` : ''}
+                            <div class="border-t pt-2 mt-2">
+                                <p class="text-xs text-gray-500 mb-1">${itemCount} item(s)</p>
+                                <div class="flex flex-wrap gap-2">
+                                    ${order.items.slice(0, 3).map(item => `
+                                        <span class="text-xs bg-gray-100 px-2 py-1 rounded">${escapeHtml(item.name)} (${item.size}) x${item.quantity}</span>
+                                    `).join('')}
+                                    ${order.items.length > 3 ? `<span class="text-xs bg-gray-100 px-2 py-1 rounded">+${order.items.length - 3} more</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-3 border-t bg-gray-50">
+                            <button onclick="viewOrderDetails('${order.orderId}')" class="w-full text-sm text-[#800020] border border-[#800020] px-3 py-1 rounded hover:bg-[#800020] hover:text-white transition">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        function viewOrderDetails(orderId) {
+            const order = allOrders.find(o => o.orderId === orderId);
+            if (!order) return;
+            
+            const date = new Date(order.date).toLocaleString();
+            const statusText = getStatusText(order.status);
+            
+            alert(`
+Order ID: ${order.orderId}
+Date: ${date}
+Status: ${statusText}
+Customer: ${order.deliveryAddress.fullName}
+Phone: ${order.deliveryAddress.phone}
+Address: ${order.deliveryAddress.street}, ${order.deliveryAddress.city}
+${order.deliveryCode ? `Delivery Code: ${order.deliveryCode}` : ''}
+Total: ${order.total.toLocaleString()} SLL
+Items: ${order.items.map(i => `${i.name} (${i.size}) x${i.quantity}`).join(', ')}
+            `);
+        }
+
+        function openStatusModal(orderId, currentStatus, existingCode) {
+            selectedOrderId = orderId;
+            document.getElementById('status-order-id').textContent = orderId;
+            document.getElementById('new-status').value = currentStatus;
+            
+            const deliveryCodeSection = document.getElementById('delivery-code-section');
+            const deliveryCodeDisplay = document.getElementById('delivery-code-display');
+            
+            if (currentStatus === 'shipped' || document.getElementById('new-status').value === 'shipped') {
+                if (existingCode) {
+                    currentDeliveryCode = existingCode;
+                } else {
+                    currentDeliveryCode = generateDeliveryCode();
+                }
+                deliveryCodeDisplay.textContent = currentDeliveryCode;
+                deliveryCodeSection.classList.remove('hidden');
+            } else {
+                deliveryCodeSection.classList.add('hidden');
+                currentDeliveryCode = null;
+            }
+            
+            document.getElementById('status-modal').classList.remove('hidden');
+            document.getElementById('status-modal').classList.add('flex');
+        }
+
+        function closeStatusModal() {
+            document.getElementById('status-modal').classList.add('hidden');
+            document.getElementById('status-modal').classList.remove('flex');
+            selectedOrderId = null;
+            currentDeliveryCode = null;
+        }
+
+        function copyDeliveryCode() {
+            const code = document.getElementById('delivery-code-display').textContent;
+            navigator.clipboard.writeText(code);
+            alert('Delivery code copied to clipboard');
+        }
+
+        function updateOrderStatus() {
+            if (!selectedOrderId) return;
+            
+            const newStatus = document.getElementById('new-status').value;
+            const orderIndex = allOrders.findIndex(o => o.orderId === selectedOrderId);
+            
+            if (orderIndex !== -1) {
+                allOrders[orderIndex].status = newStatus;
+                
+                if (newStatus === 'shipped') {
+                    if (!allOrders[orderIndex].deliveryCode) {
+                        const deliveryCode = currentDeliveryCode || generateDeliveryCode();
+                        allOrders[orderIndex].deliveryCode = deliveryCode;
+                        console.log(`[SIMULATED] Delivery code for ${selectedOrderId}: ${deliveryCode}`);
+                        alert(`Delivery Code: ${deliveryCode}\nShare this code with the delivery person.`);
+                    }
+                }
+                
+                localStorage.setItem('beinSalOrders', JSON.stringify(allOrders));
+                loadOrders();
+                closeStatusModal();
+                alert(`Order ${selectedOrderId} status updated to ${getStatusText(newStatus)}`);
+            }
+        }
+
+        // Setup navigation tabs
+        function setupNavTabs() {
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => {
+                        t.classList.remove('nav-tab-active');
+                        t.classList.add('nav-tab-inactive');
+                    });
+                    tab.classList.add('nav-tab-active');
+                    tab.classList.remove('nav-tab-inactive');
+                    
+                    currentFilter = tab.getAttribute('data-filter');
+                    filterAndDisplayOrders();
+                });
+            });
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'pending': return 'status-pending';
+                case 'processing': return 'status-processing';
+                case 'shipped': return 'status-shipped';
+                case 'delivered': return 'status-delivered';
+                case 'cancelled': return 'status-cancelled';
+                default: return 'status-pending';
+            }
+        }
+
+        function getStatusText(status) {
+            switch(status) {
+                case 'pending': return 'Pending';
+                case 'processing': return 'Processing';
+                case 'shipped': return 'Shipped';
+                case 'delivered': return 'Delivered';
+                case 'cancelled': return 'Cancelled';
+                default: return status;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('staffToken');
+                localStorage.removeItem('staffName');
+                localStorage.removeItem('staffRole');
+                window.location.href = '/admin/staff-login.html';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusSelect = document.getElementById('new-status');
+            if (statusSelect) {
+                statusSelect.addEventListener('change', () => {
+                    const deliveryCodeSection = document.getElementById('delivery-code-section');
+                    if (statusSelect.value === 'shipped') {
+                        if (!currentDeliveryCode) {
+                            currentDeliveryCode = generateDeliveryCode();
+                            document.getElementById('delivery-code-display').textContent = currentDeliveryCode;
+                        }
+                        deliveryCodeSection.classList.remove('hidden');
+                    } else {
+                        deliveryCodeSection.classList.add('hidden');
+                    }
+                });
+            }
+        });
+
+        async function init() {
+            const authorized = await checkAuth();
+            if (authorized) {
+                loadOrders();
+                setupNavTabs();
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

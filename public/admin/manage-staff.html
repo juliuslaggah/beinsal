@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Manage Staff</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 pb-8">
+    <!-- Single line header with integrated navigation -->
+    <div class="bg-[#800020] text-white p-3 sticky top-0 z-10 shadow-md">
+        <div class="flex items-center justify-between max-w-6xl mx-auto flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="users" class="w-5 h-5"></i>
+                <span class="font-bold">Manage Staff</span>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <button class="nav-tab hover:underline" data-page="dashboard">Dashboard</button>
+                <button class="nav-tab hover:underline" data-page="orders">Order Management</button>
+                <button class="nav-tab hover:underline" data-page="chat">Support Chat</button>
+                <button class="nav-tab hover:underline" data-page="delivery">Manage Delivery Persons</button>
+                <button class="nav-tab hover:underline" data-page="staff">Manage Staff</button>
+                <button class="nav-tab hover:underline" data-page="site">View Site</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="admin-name" class="text-sm">Loading...</span>
+                <button onclick="logout()" class="bg-white text-[#800020] px-2 py-1 rounded text-sm font-semibold">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6 max-w-4xl">
+        <!-- Create New Staff Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="font-semibold text-lg mb-4 flex items-center gap-2">
+                <i data-lucide="user-plus" class="w-5 h-5 text-[#800020]"></i>
+                Create New Staff Account
+            </h2>
+            <form id="create-staff-form" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Full Name *</label>
+                        <input type="text" id="full-name" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Email Address *</label>
+                        <input type="email" id="email" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Password *</label>
+                        <input type="password" id="password" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]" placeholder="Min 6 characters">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Role *</label>
+                        <select id="role" required class="w-full border rounded-lg p-2 focus:outline-none focus:border-[#800020]">
+                            <option value="">Select Role</option>
+                            <option value="order_manager">Order Manager</option>
+                            <option value="support_staff">Support Staff</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="bg-[#800020] text-white px-4 py-2 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                    Create Staff Account
+                </button>
+            </form>
+        </div>
+
+        <!-- Staff List -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="p-4 border-b bg-gray-50">
+                <h2 class="font-semibold text-lg flex items-center gap-2">
+                    <i data-lucide="users" class="w-5 h-5 text-[#800020]"></i>
+                    Staff Accounts
+                </h2>
+            </div>
+            <div id="staff-container" class="divide-y">
+                <div class="p-8 text-center text-gray-500">Loading staff accounts...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let currentStaffRole = null;
+        let currentStaffId = null;
+        let currentStaffName = null;
+
+        // Check authentication and get current staff info
+        async function checkAuth() {
+            const token = localStorage.getItem('staffToken');
+            if (!token) {
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/staff/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                if (!result.valid) {
+                    localStorage.removeItem('staffToken');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                currentStaffRole = result.role;
+                currentStaffId = result.staff_id;
+                currentStaffName = result.full_name;
+                
+                document.getElementById('admin-name').textContent = currentStaffName;
+                
+                // Only admin can access this page
+                if (currentStaffRole !== 'admin') {
+                    alert('Access denied. Admin only.');
+                    window.location.href = '/admin/orders.html';
+                    return false;
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+        }
+
+        // Navigate to different pages
+        function navigateTo(page) {
+            switch(page) {
+                case 'dashboard':
+                    window.location.href = '/admin/admin-dashboard.html';
+                    break;
+                case 'orders':
+                    window.location.href = '/admin/orders.html';
+                    break;
+                case 'chat':
+                    window.location.href = '/admin/support-chat.html';
+                    break;
+                case 'delivery':
+                    window.location.href = '/admin/manage-delivery-person.html';
+                    break;
+                case 'staff':
+                    window.location.href = '/admin/manage-staff.html';
+                    break;
+                case 'site':
+                    window.open('/', '_blank');
+                    break;
+            }
+        }
+
+        // Setup navigation tabs
+        function setupNavTabs() {
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const page = tab.getAttribute('data-page');
+                    navigateTo(page);
+                });
+            });
+        }
+
+        // Load all staff
+        async function loadStaff() {
+            const token = localStorage.getItem('staffToken');
+            
+            try {
+                const response = await fetch('/api/admin/staff', {
+                    headers: { 'Authorization': token }
+                });
+                
+                if (response.ok) {
+                    const staff = await response.json();
+                    displayStaff(staff);
+                } else {
+                    console.error('Failed to load staff');
+                    document.getElementById('staff-container').innerHTML = '<div class="p-8 text-center text-red-500">Failed to load staff</div>';
+                }
+            } catch (error) {
+                console.error('Error loading staff:', error);
+                document.getElementById('staff-container').innerHTML = '<div class="p-8 text-center text-red-500">Error loading staff</div>';
+            }
+        }
+
+        // Display staff list
+        function displayStaff(staff) {
+            const container = document.getElementById('staff-container');
+            
+            if (staff.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-gray-500">No staff accounts found</div>';
+                return;
+            }
+            
+            container.innerHTML = staff.map(member => {
+                const date = new Date(member.created_at).toLocaleDateString();
+                const roleBadge = getRoleBadge(member.role);
+                const isCurrentUser = member.id === currentStaffId;
+                
+                return `
+                    <div class="p-4 flex flex-wrap justify-between items-center gap-3">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <p class="font-semibold">${escapeHtml(member.full_name)}</p>
+                                <span class="text-xs px-2 py-0.5 rounded-full ${roleBadge.class}">${roleBadge.text}</span>
+                                ${isCurrentUser ? '<span class="text-xs text-gray-400">(You)</span>' : ''}
+                            </div>
+                            <p class="text-sm text-gray-500">${escapeHtml(member.email)}</p>
+                            <p class="text-xs text-gray-400">Created: ${date}</p>
+                        </div>
+                        ${!isCurrentUser ? `
+                            <button onclick="deleteStaff(${member.id})" class="text-red-600 hover:text-red-800">
+                                <i data-lucide="trash-2" class="w-5 h-5"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        function getRoleBadge(role) {
+            switch(role) {
+                case 'admin':
+                    return { text: 'Admin', class: 'bg-[#800020] text-white' };
+                case 'order_manager':
+                    return { text: 'Order Manager', class: 'bg-blue-100 text-blue-700' };
+                case 'support_staff':
+                    return { text: 'Support Staff', class: 'bg-green-100 text-green-700' };
+                default:
+                    return { text: role, class: 'bg-gray-100 text-gray-700' };
+            }
+        }
+
+        // Create new staff
+        document.getElementById('create-staff-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fullName = document.getElementById('full-name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+            
+            if (!fullName || !email || !password || !role) {
+                alert('Please fill all fields');
+                return;
+            }
+            
+            if (password.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+            
+            const token = localStorage.getItem('staffToken');
+            const submitBtn = document.querySelector('#create-staff-form button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating...';
+            
+            try {
+                const response = await fetch('/api/admin/staff/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token
+                    },
+                    body: JSON.stringify({
+                        fullName: fullName,
+                        email: email,
+                        password: password,
+                        role: role
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert(`Staff account created successfully!\n\nEmail: ${email}\nRole: ${role}`);
+                    document.getElementById('create-staff-form').reset();
+                    loadStaff();
+                } else {
+                    alert(result.error || 'Failed to create staff account');
+                }
+            } catch (error) {
+                console.error('Create staff error:', error);
+                alert('Network error. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Staff Account';
+            }
+        });
+
+        // Delete staff
+        async function deleteStaff(staffId) {
+            if (!confirm('Are you sure you want to delete this staff account? This action cannot be undone.')) {
+                return;
+            }
+            
+            const token = localStorage.getItem('staffToken');
+            
+            try {
+                const response = await fetch(`/api/admin/staff/${staffId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': token }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert('Staff account deleted successfully');
+                    loadStaff();
+                } else {
+                    alert(result.error || 'Failed to delete staff account');
+                }
+            } catch (error) {
+                console.error('Delete staff error:', error);
+                alert('Network error. Please try again.');
+            }
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('staffToken');
+                localStorage.removeItem('staffName');
+                localStorage.removeItem('staffRole');
+                window.location.href = '/admin/staff-login.html';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        async function init() {
+            const authorized = await checkAuth();
+            if (authorized) {
+                loadStaff();
+                setupNavTabs();
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

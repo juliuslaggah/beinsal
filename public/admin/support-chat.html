@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Admin Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .user-list-active {
+            background-color: #fef3c7;
+            border-left: 4px solid #800020;
+        }
+        .message-unread {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col">
+    <!-- Single line header with integrated navigation -->
+    <div class="bg-[#800020] text-white p-3 sticky top-0 z-10 shadow-md">
+        <div class="flex items-center justify-between max-w-6xl mx-auto flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="message-circle" class="w-5 h-5"></i>
+                <span class="font-bold">Support Chat</span>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <button class="nav-tab hover:underline" data-page="dashboard">Dashboard</button>
+                <button class="nav-tab hover:underline" data-page="orders">Order Management</button>
+                <button class="nav-tab hover:underline" data-page="chat">Support Chat</button>
+                <button class="nav-tab hover:underline" data-page="delivery">Manage Delivery Persons</button>
+                <button class="nav-tab hover:underline" data-page="staff">Manage Staff</button>
+                <button class="nav-tab hover:underline" data-page="site">View Site</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <div id="admin-status-dot" class="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span id="admin-status-text" class="text-sm">Online</span>
+                </div>
+                <button onclick="toggleAdminStatus()" id="toggle-status-btn" class="bg-white text-[#800020] px-2 py-1 rounded text-sm font-semibold">
+                    Go Offline
+                </button>
+                <button onclick="logout()" class="bg-white text-[#800020] px-2 py-1 rounded text-sm font-semibold">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- User List Sidebar -->
+        <div class="w-80 bg-white border-r border-gray-200 flex flex-col">
+            <div class="p-4 border-b bg-gray-50">
+                <h2 class="font-semibold">Conversations</h2>
+                <p class="text-xs text-gray-500 mt-1">Customers who have messaged you</p>
+            </div>
+            <div id="user-list" class="flex-1 overflow-y-auto">
+                <div class="p-4 text-center text-gray-500">Loading conversations...</div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="flex-1 flex flex-col bg-gray-50">
+            <!-- Selected User Header -->
+            <div id="chat-header" class="bg-white p-4 border-b shadow-sm">
+                <div class="text-center text-gray-400">Select a conversation from the left</div>
+            </div>
+
+            <!-- Messages Container -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <div class="text-center text-gray-400 text-sm">No conversation selected</div>
+            </div>
+
+            <!-- Message Input -->
+            <div id="message-input-area" class="bg-white border-t border-gray-200 p-3 hidden">
+                <div class="flex gap-2">
+                    <input type="text" id="reply-input" placeholder="Type your reply..." class="flex-1 border rounded-full px-4 py-2 focus:outline-none focus:border-[#800020]">
+                    <button onclick="sendReply()" class="bg-[#800020] text-white rounded-full w-10 h-10 flex items-center justify-center">
+                        <i data-lucide="send" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400 text-center mt-2">Press Enter to send</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let socket = null;
+        let adminOnline = true;
+        let currentUserId = null;
+        let conversations = [];
+        let currentMessages = [];
+        let currentStaffName = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('staffToken');
+            if (!token) {
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/staff/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                if (!result.valid) {
+                    localStorage.removeItem('staffToken');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                currentStaffName = result.full_name;
+                return true;
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+        }
+
+        // Navigate to different pages
+        function navigateTo(page) {
+            switch(page) {
+                case 'dashboard':
+                    window.location.href = '/admin/admin-dashboard.html';
+                    break;
+                case 'orders':
+                    window.location.href = '/admin/orders.html';
+                    break;
+                case 'chat':
+                    window.location.href = '/admin/support-chat.html';
+                    break;
+                case 'delivery':
+                    window.location.href = '/admin/manage-delivery-person.html';
+                    break;
+                case 'staff':
+                    window.location.href = '/admin/manage-staff.html';
+                    break;
+                case 'site':
+                    window.open('/', '_blank');
+                    break;
+            }
+        }
+
+        // Setup navigation tabs
+        function setupNavTabs() {
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const page = tab.getAttribute('data-page');
+                    navigateTo(page);
+                });
+            });
+        }
+
+        // Initialize Socket.io
+        function initSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Admin connected to socket');
+                socket.emit('admin-login');
+                loadConversations();
+            });
+            
+            socket.on('new-customer-message', (data) => {
+                console.log('New message from:', data.userId);
+                
+                if (currentUserId === data.userId) {
+                    loadChatHistory(data.userId);
+                }
+                loadConversations();
+            });
+            
+            socket.on('admin-status', (data) => {
+                // Don't update self, only other admins
+            });
+        }
+
+        function loadConversations() {
+            socket.emit('get-all-conversations', (convs) => {
+                conversations = convs;
+                displayUserList();
+            });
+            
+            setTimeout(loadConversations, 5000);
+        }
+
+        function displayUserList() {
+            const container = document.getElementById('user-list');
+            
+            if (conversations.length === 0) {
+                container.innerHTML = '<div class="p-4 text-center text-gray-500">No conversations yet</div>';
+                return;
+            }
+            
+            container.innerHTML = conversations.map(conv => {
+                const time = new Date(conv.lastTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const isActive = currentUserId === conv.userId;
+                const hasUnread = conv.unreadCount > 0;
+                
+                return `
+                    <div class="p-4 border-b cursor-pointer hover:bg-gray-50 ${isActive ? 'user-list-active' : ''}" onclick="selectUser('${conv.userId}')">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-semibold ${hasUnread ? 'message-unread' : ''}">${escapeHtml(conv.userName)}</div>
+                                <div class="text-sm text-gray-500 truncate max-w-[180px]">${escapeHtml(conv.lastMessage)}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs text-gray-400">${time}</div>
+                                ${hasUnread ? `<div class="mt-1 bg-[#800020] text-white text-xs rounded-full px-2 py-0.5">${conv.unreadCount}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        function selectUser(userId) {
+            currentUserId = userId;
+            loadChatHistory(userId);
+            
+            socket.emit('mark-read', userId);
+            
+            displayUserList();
+            document.getElementById('message-input-area').classList.remove('hidden');
+            
+            const user = conversations.find(c => c.userId === userId);
+            const userName = user ? user.userName : userId;
+            document.getElementById('chat-header').innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-semibold">${escapeHtml(userName)}</h2>
+                        <p class="text-xs text-gray-500">Customer</p>
+                    </div>
+                    <div class="text-xs text-gray-400">Type your reply below</div>
+                </div>
+            `;
+        }
+
+        function loadChatHistory(userId) {
+            socket.emit('get-chat-history', userId, (history) => {
+                currentMessages = history || [];
+                displayMessages();
+            });
+        }
+
+        function displayMessages() {
+            const container = document.getElementById('chat-messages');
+            
+            if (!currentMessages || currentMessages.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 text-sm">No messages yet. Send a reply to start the conversation.</div>';
+                return;
+            }
+            
+            container.innerHTML = currentMessages.map(msg => {
+                const isAdmin = msg.sender === 'admin';
+                const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const date = new Date(msg.timestamp).toLocaleDateString();
+                
+                if (isAdmin) {
+                    return `
+                        <div class="flex justify-end">
+                            <div class="bg-[#800020] text-white rounded-lg rounded-br-none px-4 py-2 max-w-[75%]">
+                                <p class="text-sm">${escapeHtml(msg.text)}</p>
+                                <p class="text-xs text-white opacity-70 mt-1">${date} ${time} · You</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="flex justify-start">
+                            <div class="bg-white border rounded-lg rounded-bl-none px-4 py-2 max-w-[75%] shadow-sm">
+                                <p class="text-sm">${escapeHtml(msg.text)}</p>
+                                <p class="text-xs text-gray-500 mt-1">${date} ${time} · Customer</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+            
+            container.scrollTop = container.scrollHeight;
+            lucide.createIcons();
+        }
+
+        function sendReply() {
+            const input = document.getElementById('reply-input');
+            const text = input.value.trim();
+            
+            if (!text) return;
+            if (!currentUserId) {
+                alert('Please select a conversation first');
+                return;
+            }
+            
+            const timestamp = new Date().toISOString();
+            
+            socket.emit('admin-reply', {
+                userId: currentUserId,
+                message: text,
+                timestamp: timestamp
+            });
+            
+            currentMessages.push({
+                sender: 'admin',
+                text: text,
+                timestamp: timestamp
+            });
+            displayMessages();
+            
+            input.value = '';
+            loadConversations();
+        }
+
+        function toggleAdminStatus() {
+            const statusDot = document.getElementById('admin-status-dot');
+            const statusText = document.getElementById('admin-status-text');
+            const toggleBtn = document.getElementById('toggle-status-btn');
+            
+            if (adminOnline) {
+                adminOnline = false;
+                socket.emit('admin-logout');
+                statusDot.className = 'w-2 h-2 rounded-full bg-gray-400';
+                statusText.textContent = 'Offline';
+                toggleBtn.textContent = 'Go Online';
+                toggleBtn.classList.remove('bg-white', 'text-[#800020]');
+                toggleBtn.classList.add('bg-green-600', 'text-white');
+                alert('You are now OFFLINE. Customers will see that support is unavailable.');
+            } else {
+                adminOnline = true;
+                socket.emit('admin-login');
+                statusDot.className = 'w-2 h-2 rounded-full bg-green-500';
+                statusText.textContent = 'Online';
+                toggleBtn.textContent = 'Go Offline';
+                toggleBtn.classList.remove('bg-green-600', 'text-white');
+                toggleBtn.classList.add('bg-white', 'text-[#800020]');
+                alert('You are now ONLINE. Customers can chat with you in real-time.');
+            }
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                if (socket) {
+                    socket.emit('admin-logout');
+                }
+                localStorage.removeItem('staffToken');
+                localStorage.removeItem('staffName');
+                localStorage.removeItem('staffRole');
+                window.location.href = '/admin/staff-login.html';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && document.activeElement.id === 'reply-input') {
+                sendReply();
+            }
+        });
+
+        async function init() {
+            const authorized = await checkAuth();
+            if (authorized) {
+                initSocket();
+                setupNavTabs();
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>

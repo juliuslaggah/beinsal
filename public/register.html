@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Register</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Maroon header bar with back button -->
+    <div class="bg-[#800020] text-white p-4 sticky top-0 z-10 shadow-md flex items-center gap-4">
+        <button onclick="window.location.href='/'" class="text-white">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <h1 class="text-xl font-bold flex-1 text-center">Register / Login</h1>
+        <div class="w-5"></div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-md">
+        <!-- Step 1: Phone Number -->
+        <div id="step-phone" class="bg-white rounded-lg shadow-md p-6">
+            <div class="text-center mb-6">
+                <i data-lucide="smartphone" class="w-12 h-12 text-[#800020] mx-auto mb-2"></i>
+                <h2 class="text-xl font-bold">Enter your phone number</h2>
+                <p class="text-gray-500 text-sm mt-1">We'll send you a verification code</p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">Phone Number</label>
+                <input type="tel" id="phone-number" class="w-full border rounded-lg p-3 text-lg" placeholder="076 123 456" autocomplete="off">
+                <p class="text-xs text-gray-400 mt-1">Enter your Sierra Leone mobile number</p>
+            </div>
+            
+            <button onclick="sendOTP()" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                Send Verification Code
+            </button>
+            
+            <p class="text-center text-xs text-gray-400 mt-4">
+                By continuing, you agree to BeinSal's Terms
+            </p>
+        </div>
+
+        <!-- Step 2: OTP Verification (hidden initially) -->
+        <div id="step-otp" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <div class="text-center mb-6">
+                <i data-lucide="shield-check" class="w-12 h-12 text-[#800020] mx-auto mb-2"></i>
+                <h2 class="text-xl font-bold">Verify your number</h2>
+                <p class="text-gray-500 text-sm mt-1">Enter the 6-digit code sent to <span id="display-phone" class="font-semibold"></span></p>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">Verification Code</label>
+                <input type="text" id="otp-code" class="w-full border rounded-lg p-3 text-center text-2xl tracking-widest" placeholder="000000" maxlength="6" autocomplete="off">
+                <div class="text-center mt-2">
+                    <button onclick="resendOTP()" class="text-sm text-[#800020] underline">Resend code</button>
+                    <span class="text-xs text-gray-400 mx-2">|</span>
+                    <button onclick="backToPhone()" class="text-sm text-gray-500 underline">Wrong number?</button>
+                </div>
+            </div>
+            
+            <button onclick="verifyOTP()" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                Verify & Continue
+            </button>
+        </div>
+
+        <!-- Step 3: Address Form (hidden initially) -->
+        <div id="step-address" class="bg-white rounded-lg shadow-md p-6 hidden">
+            <div class="text-center mb-6">
+                <i data-lucide="map-pin" class="w-12 h-12 text-[#800020] mx-auto mb-2"></i>
+                <h2 class="text-xl font-bold">Delivery Address</h2>
+                <p class="text-gray-500 text-sm mt-1">Where should we deliver your orders?</p>
+            </div>
+            
+            <div class="mb-3">
+                <label class="block text-sm font-medium mb-1">Full Name</label>
+                <input type="text" id="full-name" class="w-full border rounded-lg p-2" placeholder="John Doe">
+            </div>
+            
+            <div class="mb-3">
+                <label class="block text-sm font-medium mb-1">Phone Number</label>
+                <input type="tel" id="address-phone" class="w-full border rounded-lg p-2" placeholder="076 123 456">
+            </div>
+            
+            <div class="mb-3">
+                <label class="block text-sm font-medium mb-1">Region / City</label>
+                <input type="text" id="city" class="w-full border rounded-lg p-2" placeholder="Freetown, Makeni, Bo, Kenema...">
+            </div>
+            
+            <div class="mb-3">
+                <label class="block text-sm font-medium mb-1">Street Address</label>
+                <input type="text" id="street" class="w-full border rounded-lg p-2" placeholder="House number, street name">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Landmark (Optional)</label>
+                <input type="text" id="landmark" class="w-full border rounded-lg p-2" placeholder="Near the mosque, opposite school...">
+            </div>
+            
+            <button onclick="completeRegistration()" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                Complete Registration
+            </button>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        let tempPhone = '';
+        let generatedOTP = '';
+        
+        // Generate random 6-digit OTP
+        function generateOTP() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+        
+        // Send OTP
+        function sendOTP() {
+            const phone = document.getElementById('phone-number').value.trim();
+            if (!phone || phone.length < 6) {
+                alert('Please enter a valid phone number');
+                return;
+            }
+            
+            tempPhone = phone;
+            generatedOTP = generateOTP();
+            
+            // TODO: Replace with actual SMS service
+            console.log(`[SIMULATED OTP] For ${tempPhone}: ${generatedOTP}`);
+            alert(`Demo OTP: ${generatedOTP}\n(In production, this will be sent via SMS)`);
+            
+            // Show OTP step
+            document.getElementById('step-phone').classList.add('hidden');
+            document.getElementById('step-otp').classList.remove('hidden');
+            document.getElementById('display-phone').textContent = tempPhone;
+            document.getElementById('otp-code').focus();
+        }
+        
+        // Resend OTP
+        function resendOTP() {
+            generatedOTP = generateOTP();
+            console.log(`[SIMULATED OTP] Resent to ${tempPhone}: ${generatedOTP}`);
+            alert(`New Demo OTP: ${generatedOTP}`);
+        }
+        
+        // Verify OTP
+        function verifyOTP() {
+            const enteredCode = document.getElementById('otp-code').value.trim();
+            if (!enteredCode) {
+                alert('Please enter the verification code');
+                return;
+            }
+            
+            if (enteredCode !== generatedOTP) {
+                alert('Invalid verification code. Please try again.');
+                return;
+            }
+            
+            // OTP verified, show address form
+            document.getElementById('step-otp').classList.add('hidden');
+            document.getElementById('step-address').classList.remove('hidden');
+            
+            // Pre-fill phone number in address form
+            document.getElementById('address-phone').value = tempPhone;
+        }
+        
+        // Back to phone step
+        function backToPhone() {
+            document.getElementById('step-otp').classList.add('hidden');
+            document.getElementById('step-phone').classList.remove('hidden');
+            document.getElementById('phone-number').value = '';
+            generatedOTP = '';
+            tempPhone = '';
+        }
+        
+        // Complete registration - save to database
+        async function completeRegistration() {
+            const fullName = document.getElementById('full-name').value.trim();
+            const phone = document.getElementById('address-phone').value.trim();
+            const city = document.getElementById('city').value.trim();
+            const street = document.getElementById('street').value.trim();
+            const landmark = document.getElementById('landmark').value.trim();
+            
+            if (!fullName) {
+                alert('Please enter your full name');
+                return;
+            }
+            if (!phone) {
+                alert('Please enter your phone number');
+                return;
+            }
+            if (!city) {
+                alert('Please enter your region/city');
+                return;
+            }
+            if (!street) {
+                alert('Please enter your street address');
+                return;
+            }
+            
+            try {
+                // Send registration data to server
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phone: phone,
+                        fullName: fullName,
+                        city: city,
+                        street: street,
+                        landmark: landmark
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Save session token to localStorage
+                    localStorage.setItem('beinSalToken', result.token);
+                    localStorage.setItem('isLoggedIn', 'true');
+                    
+                    // Also save user data for quick access
+                    localStorage.setItem('beinSalUser', JSON.stringify({
+                        fullName: fullName,
+                        phone: phone,
+                        city: city,
+                        street: street,
+                        landmark: landmark
+                    }));
+                    
+                    alert('Registration complete! Welcome to BeinSal.');
+                    
+                    // Redirect to cart or checkout or home
+                    const returnTo = localStorage.getItem('redirectAfterLogin') || '/';
+                    localStorage.removeItem('redirectAfterLogin');
+                    window.location.href = returnTo;
+                } else {
+                    alert(result.error || 'Registration failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                alert('Network error. Please try again.');
+            }
+        }
+        
+        // Check if user is already logged in via token
+        async function checkLoggedIn() {
+            const token = localStorage.getItem('beinSalToken');
+            if (!token) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/verify-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                
+                if (result.valid) {
+                    // User is logged in, save user data and redirect
+                    localStorage.setItem('isLoggedIn', 'true');
+                    localStorage.setItem('beinSalUser', JSON.stringify(result.user));
+                    
+                    const returnTo = localStorage.getItem('redirectAfterLogin') || '/';
+                    localStorage.removeItem('redirectAfterLogin');
+                    window.location.href = returnTo;
+                } else {
+                    // Token invalid, clear it
+                    localStorage.removeItem('beinSalToken');
+                    localStorage.removeItem('isLoggedIn');
+                    localStorage.removeItem('beinSalUser');
+                }
+            } catch (error) {
+                console.error('Session check error:', error);
+            }
+        }
+        
+        checkLoggedIn();
+    </script>
+</body>
+</html>

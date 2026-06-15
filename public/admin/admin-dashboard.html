@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 pb-8">
+    <!-- Single line header with integrated navigation -->
+    <div class="bg-[#800020] text-white p-3 sticky top-0 z-10 shadow-md">
+        <div class="flex items-center justify-between max-w-6xl mx-auto flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="font-bold">Admin Panel</span>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <button class="nav-tab hover:underline" data-page="dashboard">Dashboard</button>
+                <button class="nav-tab hover:underline" data-page="orders">Order Management</button>
+                <button class="nav-tab hover:underline" data-page="chat">Support Chat</button>
+                <button class="nav-tab hover:underline" data-page="delivery">Manage Delivery Persons</button>
+                <button class="nav-tab hover:underline" data-page="staff">Manage Staff</button>
+                <button class="nav-tab hover:underline" data-page="site">View Site</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="admin-name" class="text-sm">Loading...</span>
+                <button onclick="logout()" class="bg-white text-[#800020] px-2 py-1 rounded text-sm font-semibold">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <!-- Welcome Card -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-[#800020] rounded-full flex items-center justify-center">
+                    <i data-lucide="user" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h2 id="welcome-message" class="font-bold text-lg">Welcome back!</h2>
+                    <p class="text-sm text-gray-500">Here's what's happening with your store today.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-[#800020]" id="total-orders">0</p>
+                <p class="text-xs text-gray-500">Total Orders</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-yellow-600" id="pending-orders">0</p>
+                <p class="text-xs text-gray-500">Pending</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-blue-600" id="shipped-orders">0</p>
+                <p class="text-xs text-gray-500">Shipped</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-green-600" id="delivered-orders">0</p>
+                <p class="text-xs text-gray-500">Delivered</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4 text-center">
+                <p class="text-2xl font-bold text-purple-600" id="total-revenue">0 SLL</p>
+                <p class="text-xs text-gray-500">Total Revenue</p>
+            </div>
+        </div>
+
+        <!-- Recent Orders -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+            <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                <h2 class="font-semibold text-lg flex items-center gap-2">
+                    <i data-lucide="clock" class="w-5 h-5 text-[#800020]"></i>
+                    Recent Orders
+                </h2>
+                <button onclick="navigateTo('orders')" class="text-sm text-[#800020] hover:underline">View All →</button>
+            </div>
+            <div id="recent-orders" class="divide-y">
+                <div class="p-8 text-center text-gray-500">Loading orders...</div>
+            </div>
+        </div>
+
+        <!-- Recent Chat Messages -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                <h2 class="font-semibold text-lg flex items-center gap-2">
+                    <i data-lucide="message-square" class="w-5 h-5 text-[#800020]"></i>
+                    Recent Customer Messages
+                </h2>
+                <button onclick="navigateTo('chat')" class="text-sm text-[#800020] hover:underline">Go to Chat →</button>
+            </div>
+            <div id="recent-messages" class="divide-y">
+                <div class="p-8 text-center text-gray-500">Loading messages...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let currentStaffRole = null;
+        let currentStaffName = null;
+
+        // Check authentication
+        async function checkAuth() {
+            const token = localStorage.getItem('staffToken');
+            if (!token) {
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/api/staff/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                if (!result.valid) {
+                    localStorage.removeItem('staffToken');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                currentStaffRole = result.role;
+                currentStaffName = result.full_name;
+                
+                if (currentStaffRole !== 'admin') {
+                    alert('Access denied. Admin privileges required.');
+                    window.location.href = '/admin/staff-login.html';
+                    return false;
+                }
+                
+                document.getElementById('admin-name').textContent = currentStaffName;
+                document.getElementById('welcome-message').textContent = `Welcome back, ${currentStaffName}!`;
+                
+                return true;
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = '/admin/staff-login.html';
+                return false;
+            }
+        }
+
+        // Navigate to different pages
+        function navigateTo(page) {
+            switch(page) {
+                case 'dashboard':
+                    window.location.href = '/admin/admin-dashboard.html';
+                    break;
+                case 'orders':
+                    window.location.href = '/admin/orders.html';
+                    break;
+                case 'chat':
+                    window.location.href = '/admin/support-chat.html';
+                    break;
+                case 'delivery':
+                    window.location.href = '/admin/manage-delivery-person.html';
+                    break;
+                case 'staff':
+                    window.location.href = '/admin/manage-staff.html';
+                    break;
+                case 'site':
+                    window.open('/', '_blank');
+                    break;
+            }
+        }
+
+        // Setup navigation tabs
+        function setupNavTabs() {
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const page = tab.getAttribute('data-page');
+                    navigateTo(page);
+                });
+            });
+        }
+
+        // Load dashboard data
+        function loadDashboardData() {
+            const savedOrders = localStorage.getItem('beinSalOrders');
+            let orders = [];
+            if (savedOrders) {
+                orders = JSON.parse(savedOrders);
+                orders.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+            
+            const total = orders.length;
+            const pending = orders.filter(o => o.status === 'pending').length;
+            const shipped = orders.filter(o => o.status === 'shipped').length;
+            const delivered = orders.filter(o => o.status === 'delivered').length;
+            const revenue = orders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + o.total, 0);
+            
+            document.getElementById('total-orders').textContent = total;
+            document.getElementById('pending-orders').textContent = pending;
+            document.getElementById('shipped-orders').textContent = shipped;
+            document.getElementById('delivered-orders').textContent = delivered;
+            document.getElementById('total-revenue').textContent = revenue.toLocaleString() + ' SLL';
+            
+            displayRecentOrders(orders.slice(0, 5));
+            displayRecentMessages();
+        }
+
+        function displayRecentOrders(orders) {
+            const container = document.getElementById('recent-orders');
+            
+            if (orders.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-gray-500">No orders yet</div>';
+                return;
+            }
+            
+            container.innerHTML = orders.map(order => {
+                const statusClass = getStatusClass(order.status);
+                const statusText = getStatusText(order.status);
+                const date = new Date(order.date).toLocaleDateString();
+                
+                return `
+                    <div class="p-4 flex flex-wrap justify-between items-center gap-2">
+                        <div>
+                            <p class="font-mono text-sm font-semibold">${order.orderId}</p>
+                            <p class="text-xs text-gray-500">${date} · ${escapeHtml(order.deliveryAddress.fullName)}</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs px-2 py-1 rounded-full ${statusClass}">${statusText}</span>
+                            <p class="font-semibold text-[#800020] text-sm">${order.total.toLocaleString()} SLL</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayRecentMessages() {
+            const container = document.getElementById('recent-messages');
+            const conversations = [];
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('chat_')) {
+                    const messages = JSON.parse(localStorage.getItem(key));
+                    if (messages && messages.length > 0) {
+                        const lastMsg = messages[messages.length - 1];
+                        const userId = key.replace('chat_', '');
+                        conversations.push({
+                            userId: userId,
+                            lastMessage: lastMsg.text,
+                            lastTime: lastMsg.time,
+                            sender: lastMsg.sender
+                        });
+                    }
+                }
+            }
+            
+            conversations.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
+            const recent = conversations.slice(0, 5);
+            
+            if (recent.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-gray-500">No messages yet</div>';
+                return;
+            }
+            
+            container.innerHTML = recent.map(conv => {
+                const time = new Date(conv.lastTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                return `
+                    <div class="p-4 flex flex-wrap justify-between items-center gap-2">
+                        <div>
+                            <p class="font-semibold text-sm">Customer: ${escapeHtml(conv.userId)}</p>
+                            <p class="text-sm text-gray-600 truncate max-w-[200px]">${escapeHtml(conv.lastMessage.substring(0, 50))}${conv.lastMessage.length > 50 ? '...' : ''}</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-gray-400">${time}</span>
+                            <button onclick="navigateTo('chat')" class="text-xs bg-[#800020] text-white px-2 py-1 rounded">
+                                Reply
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'pending': return 'status-pending';
+                case 'processing': return 'status-processing';
+                case 'shipped': return 'status-shipped';
+                case 'delivered': return 'status-delivered';
+                case 'cancelled': return 'status-cancelled';
+                default: return 'status-pending';
+            }
+        }
+
+        function getStatusText(status) {
+            switch(status) {
+                case 'pending': return 'Pending';
+                case 'processing': return 'Processing';
+                case 'shipped': return 'Shipped';
+                case 'delivered': return 'Delivered';
+                case 'cancelled': return 'Cancelled';
+                default: return status;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('staffToken');
+                localStorage.removeItem('staffName');
+                localStorage.removeItem('staffRole');
+                window.location.href = '/admin/staff-login.html';
+            }
+        }
+
+        async function init() {
+            const authorized = await checkAuth();
+            if (authorized) {
+                loadDashboardData();
+                setupNavTabs();
+            }
+        }
+        
+        init();
+    </script>
+
+    <style>
+        .status-pending { background-color: #fef3c7; color: #d97706; }
+        .status-processing { background-color: #dbeafe; color: #2563eb; }
+        .status-shipped { background-color: #e0e7ff; color: #4f46e5; }
+        .status-delivered { background-color: #d1fae5; color: #059669; }
+        .status-cancelled { background-color: #fee2e2; color: #dc2626; }
+    </style>
+</body>
+</html>

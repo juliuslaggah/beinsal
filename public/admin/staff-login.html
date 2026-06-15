@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Staff Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-md w-full max-w-md">
+        <!-- Header -->
+        <div class="bg-[#800020] text-white p-4 rounded-t-lg">
+            <h1 class="text-xl font-bold text-center">BeinSal Staff Login</h1>
+        </div>
+
+        <div class="p-6">
+            <div class="text-center mb-6">
+                <i data-lucide="shield" class="w-12 h-12 text-[#800020] mx-auto mb-2"></i>
+                <p class="text-gray-500 text-sm">Enter your credentials to access the staff panel</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Email Address</label>
+                    <input type="email" id="email" required class="w-full border rounded-lg p-3 focus:outline-none focus:border-[#800020]" placeholder="admin@beinsal.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Password</label>
+                    <input type="password" id="password" required class="w-full border rounded-lg p-3 focus:outline-none focus:border-[#800020]" placeholder="Enter your password">
+                </div>
+
+                <button type="submit" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                    Login
+                </button>
+            </form>
+
+            <div class="mt-4 text-center">
+                <a href="/" class="text-sm text-gray-500 hover:text-[#800020]">← Back to Homepage</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Check if already logged in
+        async function checkExistingSession() {
+            const token = localStorage.getItem('staffToken');
+            if (!token) return;
+            
+            try {
+                const response = await fetch('/api/staff/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const result = await response.json();
+                if (result.valid) {
+                    // Redirect based on role
+                    redirectByRole(result.role);
+                }
+            } catch (error) {
+                console.error('Session check error:', error);
+            }
+        }
+
+        function redirectByRole(role) {
+            switch(role) {
+                case 'admin':
+                    window.location.href = '/admin/admin-dashboard.html';
+                    break;
+                case 'order_manager':
+                    window.location.href = '/order-manager/order-manager-dashboard.html';
+                    break;
+                case 'support_staff':
+                    window.location.href = '/support-staff/support-dashboard.html';
+                    break;
+                default:
+                    window.location.href = '/admin/staff-login.html';
+            }
+        }
+
+        // Handle login form submission
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                alert('Please enter email and password');
+                return;
+            }
+            
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Logging in...';
+            
+            try {
+                const response = await fetch('/api/staff/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    localStorage.setItem('staffToken', result.token);
+                    localStorage.setItem('staffName', result.staff.full_name);
+                    localStorage.setItem('staffRole', result.staff.role);
+                    
+                    alert(`Welcome, ${result.staff.full_name}!`);
+                    
+                    // Redirect based on role
+                    redirectByRole(result.staff.role);
+                } else {
+                    alert(result.error || 'Invalid email or password');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Network error. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Login';
+            }
+        });
+        
+        checkExistingSession();
+    </script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>BeinSal - Delivery Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <div class="bg-[#800020] text-white p-4">
+        <h1 class="text-xl font-bold text-center">Delivery Person Login</h1>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-md">
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="text-center mb-6">
+                <i data-lucide="truck" class="w-12 h-12 text-[#800020] mx-auto mb-2"></i>
+                <h2 class="text-xl font-bold">Welcome Back</h2>
+                <p class="text-gray-500 text-sm mt-1">Enter your credentials to access deliveries</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Phone Number</label>
+                    <input type="tel" id="phone" required class="w-full border rounded-lg p-3 focus:outline-none focus:border-[#800020]" placeholder="076 123 456">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">PIN Code</label>
+                    <input type="password" id="pin" required class="w-full border rounded-lg p-3 focus:outline-none focus:border-[#800020]" placeholder="Enter 6-digit PIN" maxlength="6">
+                </div>
+
+                <button type="submit" class="w-full bg-[#800020] text-white py-3 rounded-lg font-semibold hover:bg-[#a00028] transition">
+                    Login
+                </button>
+            </form>
+
+            <div class="text-center mt-4">
+                <p class="text-sm text-gray-500">Don't have an account?</p>
+                <a href="/delivery/register.html" class="text-[#800020] underline text-sm">Register as Delivery Partner</a>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t text-center">
+                <a href="/" class="text-sm text-gray-500">← Back to Home</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // Handle form submission
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const phone = document.getElementById('phone').value.trim();
+            const pin = document.getElementById('pin').value.trim();
+            
+            if (!phone || !pin) {
+                alert('Please enter both phone number and PIN');
+                return;
+            }
+            
+            if (pin.length !== 6) {
+                alert('PIN must be 6 digits');
+                return;
+            }
+            
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Logging in...';
+            
+            try {
+                const response = await fetch('/api/delivery/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phone: phone,
+                        pin: pin
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Save token to localStorage
+                    localStorage.setItem('deliveryToken', result.token);
+                    localStorage.setItem('deliveryPerson', JSON.stringify(result.deliveryPerson));
+                    
+                    alert('Login successful! Redirecting to dashboard...');
+                    window.location.href = '/delivery/dashboard.html';
+                } else {
+                    alert(result.error || 'Invalid credentials. Please check your phone number and PIN.');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Network error. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Login';
+            }
+        });
+    </script>
+</body>
+</html>
+
